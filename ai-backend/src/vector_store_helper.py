@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 from typing import Union
+import asyncio
 import logging
 
 from langchain_qdrant import QdrantVectorStore
@@ -146,9 +147,8 @@ async def _identify_relevant_documents(
         collection_name = get_context_collection_name(context_id)
 
     # Check if collection exists before trying to search
-    existing_collections = [
-        col.name for col in qdrant_client.get_collections().collections
-    ]
+    collections = await asyncio.to_thread(qdrant_client.get_collections)
+    existing_collections = [col.name for col in collections.collections]
     if collection_name not in existing_collections:
         logger.warning(
             f"Collection '{collection_name}' does not exist. "
@@ -167,16 +167,18 @@ async def _identify_relevant_documents(
         must=[FieldCondition(key="namespace", match=MatchValue(value=namespace))]
     )
 
-    # Search directly using Qdrant client to preserve all metadata
-    # Note: Using sync client in async context - this might need optimization later
-    search_result = qdrant_client.query_points(
-        collection_name=vector_store.collection_name,
-        query=query_vector,
-        using="dense",
-        limit=n_docs,
-        with_payload=True,
-        query_filter=filter_condition,
-        score_threshold=score_threshold,
+    # Search via the thread pool — QdrantVectorStore still owns a sync client.
+    search_result = (
+        await asyncio.to_thread(
+            qdrant_client.query_points,
+            collection_name=vector_store.collection_name,
+            query=query_vector,
+            using="dense",
+            limit=n_docs,
+            with_payload=True,
+            query_filter=filter_condition,
+            score_threshold=score_threshold,
+        )
     ).points
 
     return _search_results_to_documents(search_result)
@@ -310,14 +312,17 @@ async def identify_relevant_votes(
         must=[FieldCondition(key="namespace", match=MatchValue(value="vote_summary"))]
     )
 
-    search_result = qdrant_client.query_points(
-        collection_name=voting_behavior_vector_store.collection_name,
-        query=query_vector,
-        using="dense",
-        limit=n_docs,
-        with_payload=True,
-        query_filter=filter_condition,
-        score_threshold=score_threshold,
+    search_result = (
+        await asyncio.to_thread(
+            qdrant_client.query_points,
+            collection_name=voting_behavior_vector_store.collection_name,
+            query=query_vector,
+            using="dense",
+            limit=n_docs,
+            with_payload=True,
+            query_filter=filter_condition,
+            score_threshold=score_threshold,
+        )
     ).points
 
     return _search_results_to_documents(search_result)
@@ -343,14 +348,17 @@ async def identify_relevant_parliamentary_questions(
         must=[FieldCondition(key="namespace", match=MatchValue(value=namespace))]
     )
 
-    search_result = qdrant_client.query_points(
-        collection_name=parliamentary_questions_vector_store.collection_name,
-        query=query_vector,
-        using="dense",
-        limit=n_docs,
-        with_payload=True,
-        query_filter=filter_condition,
-        score_threshold=score_threshold,
+    search_result = (
+        await asyncio.to_thread(
+            qdrant_client.query_points,
+            collection_name=parliamentary_questions_vector_store.collection_name,
+            query=query_vector,
+            using="dense",
+            limit=n_docs,
+            with_payload=True,
+            query_filter=filter_condition,
+            score_threshold=score_threshold,
+        )
     ).points
 
     return _search_results_to_documents(search_result)

@@ -209,12 +209,12 @@ async def acheck_fingerprint(client: Any, collection_name: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Client wiring — mirrors vector_store_helper.py lines 57-60, but LAZY:
-# this module is imported project-wide just for COLLECTION_NAME /
-# EMBEDDING_MODEL, so a module-level QdrantClient would allocate an unused,
-# never-closed client in every importing process. The client is constructed
-# only inside setup() (when none is injected) / the __main__ path.
-# api_key is None in local dev; that is valid for an unauthenticated Qdrant.
+# Client wiring is lazy: this module is imported project-wide just for
+# COLLECTION_NAME / EMBEDDING_MODEL, so a module-level QdrantClient would
+# allocate an unused, never-closed client in every importing process. The
+# client is constructed only inside setup() (when none is injected) / the
+# __main__ path. api_key is None in local dev; that is valid for an
+# unauthenticated Qdrant.
 # ---------------------------------------------------------------------------
 def _make_client() -> QdrantClient:
     """Construct the default QdrantClient from QDRANT_URL / QDRANT_API_KEY."""
@@ -369,9 +369,6 @@ def setup(client: Optional[QdrantClient] = None) -> None:
     """
     if client is None:
         client = _make_client()
-    # -----------------------------------------------------------------------
-    # Existence guard — mirrors vector_store_helper.py lines 148-155.
-    # -----------------------------------------------------------------------
     existing = [c.name for c in client.get_collections().collections]
     if COLLECTION_NAME in existing:
         print(f"Collection '{COLLECTION_NAME}' already exists — skipping creation.")

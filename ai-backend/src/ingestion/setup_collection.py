@@ -23,9 +23,10 @@ This script NEVER touches the legacy V1 collections
 (``all_parties_*``, ``justified_voting_behavior_*``, etc.).
 """
 
+import inspect
 import os
 import sys
-from typing import Optional
+from typing import Any, Optional
 
 # CLI startup ONLY: load ai-backend/.env BEFORE the constants below freeze
 # their env-derived values. Without this, `python -m src.ingestion.setup_collection`
@@ -96,17 +97,40 @@ def expected_fingerprint() -> dict:
     }
 
 
+def _fingerprint_payload(points: Any) -> Optional[dict]:
+    """Unwrap a retrieve() result into the fingerprint payload, or None."""
+    if not points:
+        return None
+    return points[0].payload
+
+
 def read_fingerprint(client: QdrantClient, collection_name: str) -> Optional[dict]:
     """Return the stored fingerprint payload, or None when absent."""
+    return _fingerprint_payload(
+        client.retrieve(
+            collection_name=collection_name,
+            ids=[FINGERPRINT_POINT_ID],
+            with_payload=True,
+            with_vectors=False,
+        )
+    )
+
+
+async def aread_fingerprint(client: Any, collection_name: str) -> Optional[dict]:
+    """Async counterpart of ``read_fingerprint`` for AsyncQdrantClient.
+
+    Also accepts a sync client or test double: a non-awaitable ``retrieve()``
+    result is used as-is so injected mocks keep working.
+    """
     points = client.retrieve(
         collection_name=collection_name,
         ids=[FINGERPRINT_POINT_ID],
         with_payload=True,
         with_vectors=False,
     )
-    if not points:
-        return None
-    return points[0].payload
+    if inspect.isawaitable(points):
+        points = await points
+    return _fingerprint_payload(points)
 
 
 def write_fingerprint(client: QdrantClient, collection_name: str) -> None:
@@ -144,21 +168,12 @@ def fingerprint_mismatch(stored: dict) -> Optional[str]:
     return "; ".join(diffs)
 
 
-def check_fingerprint(client: QdrantClient, collection_name: str) -> None:
-    """Best-effort fingerprint verification before writes/queries.
+def _enforce_fingerprint(stored: Any, collection_name: str) -> None:
+    """Raise when a well-formed stored fingerprint contradicts this process.
 
-    Raises RuntimeError when a stored fingerprint CONTRADICTS the current
-    configuration — that is the silent-vector-space-mix hazard. A missing
-    fingerprint (pre-fingerprint store) or an unreachable/limited client
-    (test fakes) only degrades to a pass: enforcement starts once setup()
-    has stamped the collection.
+    Only a well-formed fingerprint payload counts — anything else (None,
+    test doubles returning stand-in objects) means "nothing to verify".
     """
-    try:
-        stored = read_fingerprint(client, collection_name)
-    except Exception:  # noqa: BLE001 — fakes/legacy stores: nothing to verify
-        return
-    # Only a well-formed fingerprint payload counts — anything else (None,
-    # test doubles returning stand-in objects) means "nothing to verify".
     if (
         not isinstance(stored, dict)
         or stored.get("source_type") != FINGERPRINT_SOURCE_TYPE
@@ -173,6 +188,31 @@ def check_fingerprint(client: QdrantClient, collection_name: str) -> None:
             "collection's original provider/model, or re-ingest into a fresh "
             "collection (COLLECTION_NAME override) and cut over."
         )
+
+
+def check_fingerprint(client: QdrantClient, collection_name: str) -> None:
+    """Best-effort fingerprint verification before writes/queries.
+
+    Raises RuntimeError when a stored fingerprint CONTRADICTS the current
+    configuration — that is the silent-vector-space-mix hazard. A missing
+    fingerprint (pre-fingerprint store) or an unreachable/limited client
+    (test fakes) only degrades to a pass: enforcement starts once setup()
+    has stamped the collection.
+    """
+    try:
+        stored = read_fingerprint(client, collection_name)
+    except Exception:  # noqa: BLE001 — fakes/legacy stores: nothing to verify
+        return
+    _enforce_fingerprint(stored, collection_name)
+
+
+async def acheck_fingerprint(client: Any, collection_name: str) -> None:
+    """Async counterpart of ``check_fingerprint`` for the chat retrieval path."""
+    try:
+        stored = await aread_fingerprint(client, collection_name)
+    except Exception:  # noqa: BLE001 — fakes/legacy stores: nothing to verify
+        return
+    _enforce_fingerprint(stored, collection_name)
 
 
 # ---------------------------------------------------------------------------

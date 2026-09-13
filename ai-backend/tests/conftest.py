@@ -66,6 +66,17 @@ _qdrant_client_mock.search.return_value = []
 _qdrant_patch = _patch("qdrant_client.QdrantClient", return_value=_qdrant_client_mock)
 _qdrant_patch.start()
 
+_async_qdrant_client_mock = MagicMock()
+_async_qdrant_client_mock.get_collections = AsyncMock(
+    return_value=MagicMock(collections=[])
+)
+_async_qdrant_client_mock.query_points = AsyncMock(return_value=MagicMock(points=[]))
+_async_qdrant_client_mock.retrieve = AsyncMock(return_value=[])
+_async_qdrant_patch = _patch(
+    "qdrant_client.AsyncQdrantClient", return_value=_async_qdrant_client_mock
+)
+_async_qdrant_patch.start()
+
 # Also patch QdrantVectorStore to avoid any further network calls at init time.
 _vector_store_mock = MagicMock()
 _qvs_patch = _patch(
@@ -128,7 +139,7 @@ async def _fake_identify_relevant_docs(*args: Any, **kwargs: Any) -> list[Docume
 _FAKE_ZERO_VECTOR = [0.0] * 3072  # matches EMBEDDING_DIM (text-embedding-3-large)
 
 
-def _fake_retrieve(*args: Any, **kwargs: Any) -> list[dict]:
+async def _fake_retrieve(*args: Any, **kwargs: Any) -> list[dict]:
     """Deterministic retrieve() replacement — returns empty payload list."""
     return []
 
@@ -143,7 +154,7 @@ _FAKE_MANIFESTO_PAYLOAD = {
 }
 
 
-def _fake_retrieve_two_pass(query: str, **kwargs: Any) -> dict[str, list[dict]]:
+async def _fake_retrieve_two_pass(query: str, **kwargs: Any) -> dict[str, list[dict]]:
     """Deterministic retrieve_two_pass() replacement.
 
     The default context resolves a term window (region ["DE"]), so the chat
@@ -275,7 +286,7 @@ def patch_chat_io(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     # Primary patches — replace embed-once + retrieve() calls in chat_service.
     # The V1 identify_relevant_docs_with_llm_based_reranking call was removed;
-    # the single-party path now calls embed.aembed_query() then asyncio.to_thread(retrieve, ...).
+    # the single-party path now calls embed.aembed_query() then await retrieve().
     # We patch both so the SSE smoke test requires no live OpenAI key or Qdrant.
     _fake_embed_mock = MagicMock()
     _fake_embed_mock.aembed_query = AsyncMock(return_value=_FAKE_ZERO_VECTOR)

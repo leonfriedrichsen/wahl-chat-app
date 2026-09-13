@@ -23,7 +23,6 @@ This script NEVER touches the legacy V1 collections
 (``all_parties_*``, ``justified_voting_behavior_*``, etc.).
 """
 
-import inspect
 import os
 import sys
 from typing import Any, Optional
@@ -117,19 +116,13 @@ def read_fingerprint(client: QdrantClient, collection_name: str) -> Optional[dic
 
 
 async def aread_fingerprint(client: Any, collection_name: str) -> Optional[dict]:
-    """Async counterpart of ``read_fingerprint`` for AsyncQdrantClient.
-
-    Also accepts a sync client or test double: a non-awaitable ``retrieve()``
-    result is used as-is so injected mocks keep working.
-    """
-    points = client.retrieve(
+    """Return the stored fingerprint payload, or None when absent."""
+    points = await client.retrieve(
         collection_name=collection_name,
         ids=[FINGERPRINT_POINT_ID],
         with_payload=True,
         with_vectors=False,
     )
-    if inspect.isawaitable(points):
-        points = await points
     return _fingerprint_payload(points)
 
 

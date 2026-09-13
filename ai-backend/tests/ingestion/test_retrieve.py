@@ -13,9 +13,9 @@ Test coverage:
     NOT apply the re-rank (source_type != "vote_record").
   - test_penalty_tiers: three penalty tiers produce the correct effective ordering.
 
-All tests use mocked QdrantClient (no live Qdrant required) via `_client` injection
-and `query_vector` injection (no embedding API call).  Qdrant point objects are
-simulated via types.SimpleNamespace.
+All tests use a mocked AsyncQdrantClient (no live Qdrant required) via `_client`
+injection and `query_vector` injection (no embedding API call). Qdrant point
+objects are simulated via types.SimpleNamespace.
 """
 
 from __future__ import annotations
@@ -68,11 +68,12 @@ def _make_point(
 
 
 def _make_mock_client(points: list[types.SimpleNamespace]) -> MagicMock:
-    """Return a mock QdrantClient whose query_points returns the given points."""
+    """Return a mock AsyncQdrantClient whose query_points returns the given points."""
     mock_client = MagicMock()
     query_result = MagicMock()
     query_result.points = points
-    mock_client.query_points.return_value = query_result
+    mock_client.query_points = AsyncMock(return_value=query_result)
+    mock_client.retrieve = AsyncMock(return_value=[])
     return mock_client
 
 
@@ -491,7 +492,8 @@ def _make_two_pass_client(
     cur_result.points = current_points
     hist_result = MagicMock()
     hist_result.points = historic_points
-    mock_client.query_points.side_effect = [cur_result, hist_result]
+    mock_client.query_points = AsyncMock(side_effect=[cur_result, hist_result])
+    mock_client.retrieve = AsyncMock(return_value=[])
     return mock_client
 
 

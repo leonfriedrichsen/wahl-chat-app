@@ -50,6 +50,15 @@ if not _QDRANT_UP:
 _EMBEDDING_DIM = 3072  # must match setup_collection.EMBEDDING_DIM
 
 
+def _async_client():
+    """Real AsyncQdrantClient, bypassing conftest's MagicMock patch."""
+    from qdrant_client.async_qdrant_client import (
+        AsyncQdrantClient as _RealAsyncQdrantClient,
+    )
+
+    return _RealAsyncQdrantClient(url="http://localhost:6333", api_key=None)
+
+
 def _zero_vector() -> list[float]:
     """Return a deterministic all-zero embedding vector for seeding test points.
 
@@ -149,7 +158,7 @@ async def test_source_type_filter(temp_qdrant_collection) -> None:  # type: igno
             query="mindestlohn vote record",
             source_type="vote_record",
             limit=10,
-            _client=client,
+            _client=_async_client(),
             _embed_fn=_fake_embed,
         )
     finally:
@@ -220,14 +229,14 @@ async def test_source_provenance_filter(temp_qdrant_collection) -> None:  # type
             source_type="parliamentary_speech",
             source="op",
             limit=10,
-            _client=client,
+            _client=_async_client(),
             _embed_fn=_fake_embed,
         )
         unfiltered = await retrieve(
             query="lohnniveau",
             source_type="parliamentary_speech",
             limit=10,
-            _client=client,
+            _client=_async_client(),
             _embed_fn=_fake_embed,
         )
     finally:
@@ -290,7 +299,7 @@ async def test_query_vector_skips_embed(temp_qdrant_collection) -> None:  # type
             query_vector=_zero_vector(),
             source_type="vote_record",
             limit=5,
-            _client=client,
+            _client=_async_client(),
             _embed_fn=_sentinel_embed,  # Would raise if called
         )
     finally:
@@ -388,7 +397,7 @@ async def test_selective_source_type_allowed(temp_qdrant_collection) -> None:  #
             query="any query",
             source_type="vote_record",
             limit=5,
-            _client=client,
+            _client=_async_client(),
             _embed_fn=_fake_embed,
         )
     finally:
@@ -473,7 +482,7 @@ async def test_legislature_period_id_filter(temp_qdrant_collection) -> None:  # 
             party_ids_contains="csu",
             legislature_period_id=149,
             limit=10,
-            _client=client,
+            _client=_async_client(),
             _embed_fn=_fake_embed,
         )
     finally:
@@ -531,7 +540,7 @@ async def test_legislature_period_id_filter_absent_when_none(
             party_ids_contains="csu",
             legislature_period_id=None,
             limit=10,
-            _client=client,
+            _client=_async_client(),
             _embed_fn=_fake_embed,
         )
     finally:

@@ -122,10 +122,7 @@ from src.utils import (
 
 # Query-side embeddings client, resolved via the provider factory. RETRIEVAL_QUERY
 # mirrors retrieve.py: corpus passages are embedded as RETRIEVAL_DOCUMENT, so the
-# query must use the asymmetric query space (Gemini; no-op for OpenAI). Resolved
-# here directly — NOT via vector_store_helper, whose module-level vector stores
-# require the legacy V1 collections to exist in Qdrant (a fresh V2 store with only
-# wahlchat_chunks_{env} would fail at import).
+# query must use the asymmetric query space (Gemini; no-op for OpenAI).
 embed = get_embeddings(task_type="RETRIEVAL_QUERY")
 
 MAX_RESPONSE_CHUNK_LENGTH = 10  # preserved from V1 for cached-response replay

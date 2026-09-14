@@ -136,7 +136,7 @@ def get_embeddings(
         # fingerprint (setup_collection.expected_fingerprint) and
         # check_fingerprint() raises on any mismatch — encoding transport in it
         # would reject the existing corpus and force a full re-ingest.
-        from src.google_credentials import (  # noqa: PLC0415
+        from src.config.google_credentials import (  # noqa: PLC0415
             get_vertex_credentials,
             vertex_enabled,
             vertex_location,

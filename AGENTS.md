@@ -84,7 +84,7 @@ source APIs / documents
    Qdrant  wahlchat_chunks_{env}   ← single corpus collection
         │  (retrieval: filtered vector search, ai-backend/src/retrieve.py)
         ▼
-   chat_service / chatbot_async  (Gemini generation, grounded + cited)
+   services/chat  (Gemini generation, grounded + cited)
         │  (SSE, Vercel AI SDK v5 UI-message-stream)
         ▼
    web useChat  →  streamed answer + citations
@@ -188,7 +188,9 @@ corporate networks. Other routers: `pro_con`, `voting_behavior`, `misc`, plus a
 | `packages/wahlchat-common/` | Code shared by the Python components: corpus vector space + collection identity, embeddings factory, payload enums, governance levels, the 36 AW legislature periods, Vertex credentials. |
 | `ai-backend/src/app.py` | FastAPI entry point (uvicorn). |
 | `ai-backend/src/routes/` | HTTP routers: `chat` (SSE), `pro_con`, `voting_behavior`, `misc`. |
-| `ai-backend/src/chat_service.py`, `chatbot_async.py` | RAG chat pipeline + LLM streaming. |
+| `ai-backend/src/config/` | LLM client setup (`llms.py`). |
+| `ai-backend/src/core/` | Cross-cutting helpers: auth, prompts, SSE framing, utils. |
+| `ai-backend/src/services/chat/service.py`, `chatbot_async.py` | RAG chat pipeline + LLM streaming. |
 | `ai-backend/src/retrieve.py` | Query-time retrieval over the corpus: filtered vector search, two-pass term windows, vote re-rank, prefer-op dedup. |
 | `ingestion/` | Connectors + runner. Ships its own image for the scheduled Jobs. Depends on `wahlchat-common`, never on `ai-backend`. |
 | `ingestion/src/ingestion/` | Ingestion framework: `connector.py` (base class), `run.py` (runner), `registry.py`, `schemas.py` (data contract), `setup_collection.py`, `embeddings.py`, `vertex_credentials.py`, `governance_levels.py`, `legislature_config.py`, `ids.py`, `speech_key.py`, `speech_dedup.py`. |

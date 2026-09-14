@@ -29,9 +29,9 @@ from datetime import datetime, timezone
 
 import pytest
 
-import src.services.chat_service as cs
+import src.services.chat.service as cs
 import src.services.chat.chatbot_async as ca
-from src.services.chat_service import (
+from src.services.chat.service import (
     RetrievalUnavailableError,
     fetch_party_response_stream,
 )

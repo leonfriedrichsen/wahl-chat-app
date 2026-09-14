@@ -65,7 +65,7 @@ from src.models.vote import (
     VotingResultsByParty,
     VotingResultsOverall,
 )
-from src.services.chat_service import MAX_RESPONSE_CHUNK_LENGTH
+from src.services.chat.service import MAX_RESPONSE_CHUNK_LENGTH
 from src.core.utils import GENERIC_ERROR_MESSAGE
 
 logger = logging.getLogger(__name__)

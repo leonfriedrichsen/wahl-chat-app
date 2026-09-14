@@ -124,7 +124,7 @@ async def test_sse_routes_use_event_source_response_with_ping():
     from src.routes import chat as chat_route
 
     assert not hasattr(
-        __import__("src.services.chat_service", fromlist=["chat_service"]),
+        __import__("src.services.chat.service", fromlist=["chat_service"]),
         "with_heartbeat",
     ), "custom heartbeat wrapper must be gone (EventSourceResponse ping owns it)"
     source = inspect.getsource(chat_route)
@@ -206,14 +206,14 @@ async def test_proposed_question_with_free_text_history_not_cached(
     write_mock = AsyncMock()
     write_rag_mock = AsyncMock()
     monkeypatch.setattr(
-        "src.services.chat_service.aget_proposed_questions_for_context",
+        "src.services.chat.service.aget_proposed_questions_for_context",
         _fake_proposed_questions,
     )
     monkeypatch.setattr(
-        "src.services.chat_service.awrite_cached_answer_for_party", write_mock
+        "src.services.chat.service.awrite_cached_answer_for_party", write_mock
     )
     monkeypatch.setattr(
-        "src.services.chat_service.awrite_cached_rag_query", write_rag_mock
+        "src.services.chat.service.awrite_cached_rag_query", write_rag_mock
     )
 
     body = dict(_CHAT_REQUEST_BODY)
@@ -236,14 +236,14 @@ async def test_first_turn_proposed_question_is_cached(patch_chat_io, app, monkey
     write_mock = AsyncMock()
     write_rag_mock = AsyncMock()
     monkeypatch.setattr(
-        "src.services.chat_service.aget_proposed_questions_for_context",
+        "src.services.chat.service.aget_proposed_questions_for_context",
         _fake_proposed_questions,
     )
     monkeypatch.setattr(
-        "src.services.chat_service.awrite_cached_answer_for_party", write_mock
+        "src.services.chat.service.awrite_cached_answer_for_party", write_mock
     )
     monkeypatch.setattr(
-        "src.services.chat_service.awrite_cached_rag_query", write_rag_mock
+        "src.services.chat.service.awrite_cached_rag_query", write_rag_mock
     )
 
     body = dict(_CHAT_REQUEST_BODY)
@@ -280,13 +280,13 @@ async def test_proposed_question_lookup_uses_request_context(
     """The cache gate reads questions for the request context, not the global list."""
     lookup = AsyncMock(side_effect=_fake_proposed_questions)
     monkeypatch.setattr(
-        "src.services.chat_service.aget_proposed_questions_for_context", lookup
+        "src.services.chat.service.aget_proposed_questions_for_context", lookup
     )
     monkeypatch.setattr(
-        "src.services.chat_service.awrite_cached_answer_for_party", AsyncMock()
+        "src.services.chat.service.awrite_cached_answer_for_party", AsyncMock()
     )
     monkeypatch.setattr(
-        "src.services.chat_service.awrite_cached_rag_query", AsyncMock()
+        "src.services.chat.service.awrite_cached_rag_query", AsyncMock()
     )
 
     await _drain_chat_stream(app, dict(_CHAT_REQUEST_BODY))
@@ -310,14 +310,14 @@ async def test_proposed_question_from_other_context_is_not_cached(
     write_mock = AsyncMock()
     write_rag_mock = AsyncMock()
     monkeypatch.setattr(
-        "src.services.chat_service.aget_proposed_questions_for_context",
+        "src.services.chat.service.aget_proposed_questions_for_context",
         _only_other_context,
     )
     monkeypatch.setattr(
-        "src.services.chat_service.awrite_cached_answer_for_party", write_mock
+        "src.services.chat.service.awrite_cached_answer_for_party", write_mock
     )
     monkeypatch.setattr(
-        "src.services.chat_service.awrite_cached_rag_query", write_rag_mock
+        "src.services.chat.service.awrite_cached_rag_query", write_rag_mock
     )
 
     body = dict(_CHAT_REQUEST_BODY)

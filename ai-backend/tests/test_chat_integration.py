@@ -143,10 +143,10 @@ async def test_multi_party_responses_non_empty_history(patch_chat_io, app, monke
         return (["spd", "cdu"], "Was ist eure Position zum Klimaschutz?", False)
 
     monkeypatch.setattr(
-        "src.services.chat_service.aget_parties_for_context", _two_parties
+        "src.services.chat.service.aget_parties_for_context", _two_parties
     )
     monkeypatch.setattr(
-        "src.services.chat_service.get_question_targets_and_type", _two_targets
+        "src.services.chat.service.get_question_targets_and_type", _two_targets
     )
 
     events = await _drain(
@@ -224,10 +224,10 @@ async def test_comparison_response(patch_chat_io, app, monkeypatch):
         return (["spd", "cdu"], "Vergleiche die Klimapositionen von SPD und CDU.", True)
 
     monkeypatch.setattr(
-        "src.services.chat_service.aget_parties_for_context", _two_parties
+        "src.services.chat.service.aget_parties_for_context", _two_parties
     )
     monkeypatch.setattr(
-        "src.services.chat_service.get_question_targets_and_type", _comparison_targets
+        "src.services.chat.service.get_question_targets_and_type", _comparison_targets
     )
 
     events = await _drain(

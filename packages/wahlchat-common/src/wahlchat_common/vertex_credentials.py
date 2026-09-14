@@ -6,7 +6,7 @@
 
 The service-account key belongs to the BILLING project (a different GCP project
 than the one this service runs in). It must NEVER become ambient ADC:
-``ai-backend/src/firebase_service.py`` falls back to a bare ``initialize_app()`` when no
+``ai-backend/src/services/firebase_service.py`` falls back to a bare ``initialize_app()`` when no
 cert file is on disk — which is always the case in the image, since
 ``.dockerignore`` keeps keys out of the build context. Exporting
 ``GOOGLE_APPLICATION_CREDENTIALS`` here would therefore make firebase-admin
@@ -23,7 +23,7 @@ Two failure modes, deliberately treated differently:
 *Unconfigured* — no ``VERTEX_*`` credential source at all. The expected state in CI
 and local development. Resolves to ``None`` quietly, and the caller falls back to
 Google AI Studio (``GOOGLE_API_KEY``). Chat clients are in
-``ai-backend/src/llms.py``. The embedding factory is ``wahlchat_common.embeddings``.
+``ai-backend/src/config/llms.py``. The embedding factory is ``wahlchat_common.embeddings``.
 
 *Misconfigured* — a source WAS supplied but is unusable (blank value, missing file,
 corrupt key, unresolvable project). That is operator error, and staying quiet about
@@ -32,7 +32,7 @@ keeps landing on the project this module exists to move it off. So it always log
 warning, and under ``VERTEX_REQUIRED`` it raises ``VertexConfigError`` instead.
 
 ``VERTEX_REQUIRED`` is off by default. An import-time raise stops
-``ai-backend/src/llms.py`` and the chat service with it. A missing key is valid
+``ai-backend/src/config/llms.py`` and the chat service with it. A missing key is valid
 in CI and in local development. Set the variable on a deployed revision.
 A failed revision is safer than spend on the wrong project.
 """

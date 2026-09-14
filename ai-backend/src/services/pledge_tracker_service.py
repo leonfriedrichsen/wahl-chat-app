@@ -27,7 +27,7 @@ from typing import Any, Awaitable, Callable, Optional, cast
 
 from langchain_core.messages import BaseMessage, HumanMessage
 
-from src.firebase_service import aget_pledges_by_ids
+from src.services.firebase_service import aget_pledges_by_ids
 from src.retrieve import retrieve
 from src.models.pledge_tracker import PledgeTrackerSuggestions
 from src.models.structured_outputs import PledgeRelevanceOutput
@@ -59,7 +59,7 @@ _StructuredOutputFn = Callable[[list[BaseMessage]], Awaitable[Any]]
 
 
 async def _default_structured_output(messages: list[BaseMessage]) -> Any:
-    from src.llms import (  # noqa: PLC0415
+    from src.config.llms import (  # noqa: PLC0415
         PRE_AND_POST_PROCESSING_LLMS,
         get_structured_output_from_llms,
     )

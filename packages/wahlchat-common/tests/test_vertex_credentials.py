@@ -11,7 +11,7 @@ design:
   1. UNCONFIGURED degrades quietly. With no VERTEX_* credential source set,
      resolution returns None without raising and without warning, because every
      caller treats None as "fall back to Google AI Studio". A raise here would
-     take down module import of ai-backend/src/llms.py and with it the whole service. This
+     take down module import of ai-backend/src/config/llms.py and with it the whole service. This
      is the CI and local-dev path.
 
   2. MISCONFIGURED is never silent. A source that WAS supplied but is unusable

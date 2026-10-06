@@ -28,7 +28,7 @@ from typing import Any, Awaitable, Callable, Optional, cast
 from langchain_core.messages import BaseMessage, HumanMessage
 
 from src.firebase_service import aget_pledges_by_ids
-from src.ingestion.retrieve import retrieve
+from src.retrieve import retrieve
 from src.models.pledge_tracker import PledgeTrackerSuggestions
 from src.models.structured_outputs import PledgeRelevanceOutput
 

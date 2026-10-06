@@ -12,7 +12,7 @@ EMBEDDING_* / ENV / COLLECTION_NAME override per deployment. The write side
 from __future__ import annotations
 
 import os
-from typing import Optional
+from typing import Any, Optional
 
 from qdrant_client import QdrantClient, models
 
@@ -81,19 +81,12 @@ def fingerprint_mismatch(stored: dict) -> Optional[str]:
     return "; ".join(diffs)
 
 
-def check_fingerprint(client: QdrantClient, collection_name: str) -> None:
-    """Best-effort fingerprint verification before writes/queries.
+def _enforce_fingerprint(stored: Any, collection_name: str) -> None:
+    """Raise when a well-formed stored fingerprint contradicts this process.
 
-    Raises when a stored fingerprint CONTRADICTS the current config — the main
-    runtime guard against the two packages drifting apart. A missing fingerprint
-    or an unreachable client degrades to a pass.
+    Only a well-formed fingerprint payload counts — anything else (None,
+    test doubles returning stand-in objects) means "nothing to verify".
     """
-    try:
-        stored = read_fingerprint(client, collection_name)
-    except Exception:  # noqa: BLE001 — fakes/legacy stores: nothing to verify
-        return
-    # Only a well-formed fingerprint payload counts — anything else (None,
-    # test doubles returning stand-in objects) means "nothing to verify".
     if (
         not isinstance(stored, dict)
         or stored.get("source_type") != FINGERPRINT_SOURCE_TYPE
@@ -108,6 +101,40 @@ def check_fingerprint(client: QdrantClient, collection_name: str) -> None:
             "collection's original provider/model, or re-ingest into a fresh "
             "collection (COLLECTION_NAME override) and cut over."
         )
+
+
+def check_fingerprint(client: QdrantClient, collection_name: str) -> None:
+    """Best-effort fingerprint verification before writes/queries.
+
+    Raises when a stored fingerprint CONTRADICTS the current config — the main
+    runtime guard against the two packages drifting apart. A missing fingerprint
+    or an unreachable client degrades to a pass.
+    """
+    try:
+        stored = read_fingerprint(client, collection_name)
+    except Exception:  # noqa: BLE001 — fakes/legacy stores: nothing to verify
+        return
+    _enforce_fingerprint(stored, collection_name)
+
+
+async def acheck_fingerprint(client: Any, collection_name: str) -> None:
+    """Async counterpart of ``check_fingerprint`` for the chat retrieval path.
+
+    ``retrieve()`` holds an ``AsyncQdrantClient``. The pass/fail rules are the
+    same as the sync check: a missing fingerprint or an unreachable client
+    degrades to a pass, a contradiction raises.
+    """
+    try:
+        points = await client.retrieve(
+            collection_name=collection_name,
+            ids=[FINGERPRINT_POINT_ID],
+            with_payload=True,
+            with_vectors=False,
+        )
+    except Exception:  # noqa: BLE001 — fakes/legacy stores: nothing to verify
+        return
+    stored = points[0].payload if points else None
+    _enforce_fingerprint(stored, collection_name)
 
 
 # Lazy: this module is imported project-wide just for the constants, so a

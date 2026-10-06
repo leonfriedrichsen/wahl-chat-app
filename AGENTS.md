@@ -71,8 +71,10 @@ Dockerfile installs one deployable plus `wahlchat-common`, and nothing else.
   parties, chat sessions); the Firestore emulator is used in local dev.
 - **Qdrant** — the single vector store for the corpus (one collection per
   environment).
-- **Google Gemini + OpenAI** — Gemini `gemini-embedding-2` @ 3072 for embeddings;
-  Gemini (via `langchain-google-genai`) for answer generation.
+- **Google Gemini** — `gemini-embedding-2` for embeddings and Gemini (via
+  `langchain-google-genai`) for answer generation. The embeddings factory can
+  also build an OpenAI client, but no environment runs it; see the locked-model
+  note under "How to treat data".
 
 ### Data flow
 
@@ -133,6 +135,17 @@ Connectors are registered in a closed `{connector_id: factory}` map
   re-decides the same thing per document on every run, which makes it idempotent if
   that hook ever fails. Both read the class from the object path, so neither can
   remove a document the AW copy does not replace.
+
+Outside the registry (bespoke runner, like the manifesto bulk CLIs):
+
+- `pledgetracker` — evidence timelines for political pledges from the Cambridge
+  PledgeTracker research project (EMNLP 2025 demo,
+  https://aclanthology.org/2025.emnlp-demos.64/). Not in `CONNECTOR_FACTORIES`:
+  pledges have no monotonic cursor and the runner dual-writes Firestore
+  (`pledges/{pledge_id}`, the source of truth incl. timelines) + Qdrant (one
+  `pledge_record` vector per pledge, timelines never embedded). Runner:
+  `ingestion/src/ingestion/connectors/pledgetracker/bulk.py` (see "Running
+  PledgeTracker ingestion").
 
 The **data contract** is the Pydantic model set in
 `ingestion/src/ingestion/schemas.py`
@@ -263,7 +276,7 @@ ingestion CLIs fall back to it when `ingestion/.env` does not exist.
 make run-abgeordnetenwatch-votes          # federal votes
 make run-all-landtage-votes               # loop over all 16 Landtag legislatures
 make run-speeches ARGS="--batch-size 25"  # live DIP speeches
-make run-manifestos ARGS="--dry-run"      # parse only, zero OpenAI cost
+make run-manifestos ARGS="--dry-run"      # parse only, zero embedding cost
 make run-manifesto-uploads ARGS="--check" # validate uploaded-PDF metadata
 make speeches-stats                       # read-only Qdrant verification
 ```
@@ -280,13 +293,192 @@ path carries the metadata — election and party must already exist in
    where `{class}` is `wahlprogramme` (the programme the party runs on — AW may
    later replace it) or `parteidokumente` (a Grundsatzprogramm or Satzung we hold
    only because the party published no Wahlprogramm — never auto-retired).
-2. Add the object path to `ai-backend/data/manifesto_uploads/{env}.txt`.
+2. Add the object path to `ingestion/data/manifesto_uploads/{env}.txt`.
 3. `make upload-manifesto-uploads` (uploads + grants public read).
 4. `make run-manifesto-uploads ARGS="--check"`, then drop `ARGS` to ingest.
 
 `--since` (or `MANIFESTO_UPLOADS_SINCE`) floors by election date; documents below it
 are neither ingested nor retired. Removing a manifest line retires that document's
 chunks on the next run.
+
+#### Running PledgeTracker ingestion
+
+The Cambridge queue API is an async job queue in front of a single GPU: one job
+at a time, ~3 minutes per pledge, results stored server-side. We own the pledge
+list (`ingestion/data/pledges/*.jsonl`: claim, `pledge_date`, `pledge_author`,
+optional `bundesland`/`party_id`/source metadata). Bundesländer map to ISO
+3166-2 region codes (`DE-ST`), which must match the context seeds' `region_path`
+elements. The runner is incremental: a freshness watermark skips pledges checked
+within `--freshness-days` (default 7), interrupted runs resume via the job id
+persisted on the Firestore doc, and `--batch-size` (default 3) bounds each
+invocation — sized for the 15-minute scheduled-job cap. Pledge identity is
+`party_id:claim:region:pledge_date`, so NEVER reword a claim in place — a live
+run ends with a reconcile that retires store pledges no longer in the registry
+(edited claims, removed rows), scoped to the registry's own regions
+(`--skip-reconcile` opts out).
+
+Requires `PLEDGETRACKER_API_KEY` in `ingestion/.env` (falling back to
+`ai-backend/.env`; gitignored — never commit
+it) and `PLEDGETRACKER_ENABLE_LIVE=true`; without them the runner ingests the
+packaged demo fixture offline. `FIRESTORE_EMULATOR_HOST` is mandatory unless
+`ENV=prod` (accidental-write guard); pass `--allow-remote` to deliberately
+ingest into the deployed dev environment without an emulator. The flag unsets
+the emulator host even if `.env` still has it (local mode sets it by default).
+
+```bash
+FIRESTORE_EMULATOR_HOST=localhost:8081 make run-pledgetracker ARGS="--dry-run"
+FIRESTORE_EMULATOR_HOST=localhost:8081 PLEDGETRACKER_ENABLE_LIVE=true \
+  make run-pledgetracker ARGS="--registry data/pledges/sachsen_anhalt_pledges.jsonl --batch-size 2"
+# Deployed dev Firestore (wahl-chat-dev), not the emulator:
+make run-pledgetracker ARGS="--allow-remote --registry data/pledges/sachsen_anhalt_pledges.jsonl --batch-size 2"
+# Backfill short event headlines only (LLM calls, no queue jobs / Qdrant writes):
+FIRESTORE_EMULATOR_HOST=localhost:8081 make run-pledgetracker ARGS="--backfill-titles"
+```
+
+Data-handling invariants: Cambridge's per-event `Ja`/`Nein` label maps to
+`is_relevant_for_tracking` (useful evidence), never a fulfilled/broken verdict —
+UI copy says "Ziele", not "Versprechen"; the events' full source text is never
+stored (`url`/`title` suffice); the chat-side lookup is best-effort and may
+return nothing (the UI then shows no PledgeTracker entry point).
+
+#### The PledgeTracker study (consent, cohorts, questionnaire)
+
+An in-app experiment with the Vlachos group (University of Cambridge): does
+PledgeTracker change users' willingness to engage in political debate?
+
+- **Scope**: only `abgeordnetenhauswahl-berlin-2026` and
+  `landtagswahl-mecklenburg-vorpommern-2026` — `STUDY_CONTEXT_IDS` in
+  `web/lib/pledge-study/study-config.ts`, which also holds the prompt-timing
+  constants, the cohort hash, and the questionnaire form id. The shared
+  vocabulary (`StudyParticipation`, `StudyCohort`) lives in
+  `web/lib/pledge-study/types.ts`: **participation** says whether a user
+  consented to the research instruments (`experimental` / `regular`), **cohort**
+  says which version of the product they get (`control` / `manipulation`). The
+  two are INDEPENDENT: everyone who answers the dialog is assigned an arm,
+  declines included, so a `regular` user can be in `manipulation` and see the
+  feature. "experimental" therefore never means "sees the feature".
+- **Kill switch**: Firestore doc `system_status/pledge_study` `{enabled: true}`.
+  Missing doc/field/error = off (the safe default); flipping it is a console
+  edit, no deploy. **Off means PledgeTracker is hidden in EVERY context, not
+  just the study ones** — the feature is new and only ships inside a study for
+  now, so switching the study off must not silently roll the feature out to
+  every election. Turning it ON is therefore what NARROWS visibility, to the
+  manipulation arm inside a study context. It follows that non-study elections
+  need the switch value too, which is why `ChatStudyWrapper` mirrors it into
+  the store in every context. The local emulator UI is disabled, so write the doc over
+  REST instead, with `-H 'Authorization: Bearer owner'` (plain writes are
+  refused by the rules).
+  The questionnaire form id is COMMITTED (`STUDY_QUESTIONNAIRE_FORM_ID` in
+  `web/lib/pledge-study/study-config.ts`), like every other Fillout form here,
+  so a fresh checkout and both deployments work with no env setup;
+  `NEXT_PUBLIC_STUDY_QUESTIONNAIRE_URL` only overrides it for a test form.
+- **Flow**: fresh chat in a study context → two-stage consent (short ask, then
+  the Einverständniserklärung). A „Nein" is permanent per uid, and dismissing
+  the dialog (Escape, overlay click, drawer swipe) is recorded as that same
+  „Nein" — only an explicit „Ja" enrols, and everyone who was asked leaves a
+  record, so the consent denominator is complete. A „Ja" assigns the cohort —
+  deterministic hash(uid+salt), p=0.5 — and persists `study_participants/{uid}`
+  with `participation`, `cohort` and `assignment_source` (the analysis source
+  of truth). NEVER change the salt while the study runs.
+  Both answers also record `context_id` and `party_ids` (the parties selected
+  when the ask appeared), so non-response can be modelled rather than just
+  counted — refusal by election, and by the party the user came to chat with.
+  Every answer also records `consent_stage` (`ask` | `consent`) and, on a
+  decline, `decline_reason` (`explicit` | `dismissed`): all four refusal paths
+  land in the same action, and without these the short ask and the formal
+  Einverständniserklärung are one undifferentiated number. Acceptances are
+  always `consent_stage: 'consent'`. Rows written before 2026-09-17 have
+  neither field — that is what "stage unknown" means in the analysis. Note
+  that closing the TAB still leaves no record at all, at either stage.
+  BOTH answers also assign and persist a `cohort`, from the same
+  `hash(uid+salt)`, so a uid's arm never depends on the answer it gave. The 76
+  declines written before 2026-09-18 have no cohort, and are **deliberately
+  left that way — do NOT backfill them**. A missing cohort on a declined row
+  is the marker for the old regime: those users were never exposed to the
+  feature, so pooling them with post-2026-09-18 declines would mix the
+  unexposed in with the A/B sample. They are never re-asked either (consent is
+  sticky), so they stay arm-less for good, by choice.
+  The `?sg=x` ("declined") override is the one decline that stays arm-less on
+  purpose — it demonstrates that experience — and the decline action honours
+  that absence instead of hashing an arm in.
+- **Gate** (`web/lib/pledge-study/gate.ts`): the switch is checked FIRST — off
+  or not-yet-known hides PledgeTracker everywhere. With it on, a study context
+  admits the `manipulation` arm and nobody else. **THE ARM DECIDES, NOT THE
+  CONSENT ANSWER** (changed 2026-09-18): consent governs the research
+  instruments, the arm governs which build of the product is served, and
+  requiring both left the manipulation arm in single digits. Control sees
+  nothing — that is the comparison — and a user who was never asked has no arm
+  and sees nothing either. Pre-exposure cannot contaminate anyone: the arm is a
+  deterministic `hash(uid+salt)`, identical whenever it is computed, so there is
+  no later assignment to spoil. Any other context is the ordinary product and
+  shows the feature to everyone. Covered by `gate.test.ts`.
+- **Telemetry** (`recordStudyEvent`, written for EVERYONE who answered the
+  dialog — both arms and both answers; a user who was never asked has no row
+  and is a strict no-op, or the consent denominator would be destroyed):
+  append-only `events` on the participant doc — `first_message`, `first_answer_completed`,
+  `second_answer_completed`, `pledge_shown` (viewport exposure),
+  `pledge_modal_open`/`_close`,
+  `prompt_shown`/`prompt_dismissed` (with trigger), `questionnaire_clicked`.
+  Counts and firsts are derived from the log at analysis time.
+- **Questionnaire prompts** (identical for both cohorts — control symmetry,
+  and now genuinely so): `second_answer` fires `SECOND_ANSWER_DELAY_MS` (10s)
+  after the PARTICIPANT's second answer completes; `absolute_timer` fires
+  `ABSOLUTE_FALLBACK_MS` (90s) after the first completed answer of the chat,
+  so a user who never sends a second message is still asked once. Both stand
+  down once anything has prompted, so whichever comes first wins and two
+  prompts cannot land seconds apart. Max 2 prompts ever, cap survives reloads.
+  The answer count is per PARTICIPANT, not per chat: it is seeded from the
+  event log at hydration and carried through `newChat`, because `newChat`
+  empties `messages` and a per-chat count would silently miss a second
+  question asked in a fresh chat. **Nothing about prompting reads PledgeTracker state.** The former
+  `modal_close` and `longstop` triggers did, and since only the manipulation
+  arm can open a pledge modal, that arm had prompt paths control could never
+  reach — differential prompt exposure inside the instrument measuring the
+  outcome. Rows written before this change carry the retired
+  `timer`/`modal_close`/`longstop` trigger values; the vocabulary was renamed
+  rather than reused so the two regimes stay distinguishable in `events`.
+  The form opens IN-APP via
+  `FilloutPopupEmbed` (same pattern as `survey-banner.tsx`), carrying
+  `user_id` + `chat_session_id` + `cohort` as parameters (matching the form's
+  hidden fields); trigger/context stay in the event log. Passing the cohort
+  reverses the original no-self-unblinding rule — it is readable in the iframe
+  URL — and it is a CONVENIENCE COPY only: `study_participants/{uid}` stays
+  authoritative, because it alone carries `assignment_source` and so tells a
+  real participant from a `?sg=` tester. A Fillout row's `cohort` cannot do
+  that on its own. While the
+  study is on, the study questionnaire is the ONLY thing anyone is asked for,
+  app-wide: `StudyStatusProvider` holds one kill-switch subscription and
+  `useStudyRunning()` suppresses the general feedback banner, the newsletter
+  step after login, and the Wahl-Swiper feedback card. The rule ignores the
+  cohort and consent, so no arm is exposed differently, and everything returns
+  the moment the kill switch goes off.
+- **Analysis joins**: `study_participants/{uid}` ↔ `chat_sessions.user_id`
+  (sessions are also stamped `study_cohort` + `is_pledge_study`) ↔
+  `page_visits.user_id`/`chat_session_ids` (dwell time) ↔ the questionnaire's
+  `user_id` + `chat_session_id` answers. The uid is the Firebase anonymous uid
+  throughout.
+- **Forcing a variant** (`web/lib/pledge-study/variant-override.ts`): append
+  `?sg=a` (consented control), `?sg=b` (consented manipulation), `?sg=x`
+  (declined) in a study context; `?sg=off` clears it. Works in dev AND prod,
+  including before launch — an override also forces the study on for that
+  browser, client-side only, so the prod kill switch being off does not block
+  testing. The values are opaque so a participant cannot read their arm off the
+  URL; there is deliberately no signing or validation, since the repo is public
+  and the bundle is inspectable. Persisted per tab in sessionStorage, ignored
+  for Prolific participants.
+  **Forced rows are flagged** `assignment_source: 'override'` (plus
+  `override_variant`, `override_at`) and MUST be excluded from analysis. The
+  flag write touches marker fields ONLY, never `consent_answer`/`cohort`, so
+  it cannot destroy a real record — but **use a fresh browser profile**: an
+  override link opened in a genuine participant's profile flags that
+  participant out of the study. Two caveats: an override link bypasses the kill
+  switch, and variants a/b can submit the real questionnaire, which Fillout
+  records without the flag (cross-reference on `user_id` to exclude).
+- Known simplifications: a prompt can land while another dialog is open (the
+  triggers are time- and turn-based, not idle-based); the kill switch is
+  client-read only
+  (default-off hides everything until the snapshot arrives); a second device
+  is a new participant (anonymous auth — accepted trade-off).
 
 De-dup with AW is two-way and party+region+date scoped: an upload is skipped if AW
 already has that party's programme; once AW ingests it, its `post_upsert` deletes
@@ -345,15 +537,24 @@ The two stores are seeded by different mechanisms, on purpose:
   is missing/empty. Unset locally/in CI/tests, so an empty local store still
   boots.
 - **The embedding model and vector store are locked.** Qdrant is the vector
-  store; embeddings are Gemini `gemini-embedding-2` at 3072 dimensions,
-  COSINE distance. Do not mix models or dimensions — it breaks index parity.
-  Treat `EMBEDDING_DIM` / `EMBEDDING_MODEL` in `setup_collection.py` as
-  immutable after the first run. They are defined there exactly once and
-  stamped into the collection as a fingerprint point; every write path and the
-  backend's `retrieve()` call `check_fingerprint()`, which raises rather than
-  let a query run against vectors from a different model. That guard is what
-  keeps the two packages honest across the split — it lives in the corpus, not
-  in either codebase.
+  store; embeddings are Gemini `gemini-embedding-2` at 3072 dimensions, COSINE
+  distance. Do not mix models or dimensions — it breaks index parity. Treat
+  `EMBEDDING_DIM` / `EMBEDDING_MODEL` in `wahlchat_common.corpus` (re-exported
+  by `setup_collection.py`) as immutable after the first run.
+
+  A collection name cannot prove which model produced its vectors, and OpenAI's
+  `text-embedding-3-large` is also 3072-dimensional, so the dimension guard
+  alone would pass on a mixed store. Every read and write therefore calls
+  `check_fingerprint()` (async `acheck_fingerprint()` on the chat path), which
+  compares the collection's recorded provider/model/dim against the running
+  configuration and raises on a mismatch. That guard is what keeps the two
+  packages honest across the split — it lives in `wahlchat_common.corpus`, not
+  in either deployable.
+
+  Note that `get_embeddings()` still falls back to OpenAI when
+  `EMBEDDING_PROVIDER` is unset, so `ai-backend/.env` (or `ingestion/.env`)
+  must set it — copy `.env.example`. Without it, ingestion and retrieval fail
+  at the fingerprint check rather than reading the corpus.
 - **The corpus is source-cited.** Chunks carry `citation_url` / `citation_title`
   and an `authority_tier` (`authoritative` | `factual_record` | `self_reported`
   | `promotional`). Preserve citations end-to-end; answers are grounded in
@@ -416,8 +617,15 @@ python3 scripts/check_gdpr_wall.py
 cd web
 bun run lint                      # next lint + biome ci
 bun run typecheck                 # tsc --noEmit
-bun run build
+bun run test                      # bun test
+bun run build                     # stop the dev server first — see below
 ```
+
+`bun run build` and `next dev` share `web/.next`, so building while a dev server
+is running corrupts it: pages start failing with
+`Cannot find module './vendor-chunks/@firebase.js'`, or render with no stylesheet
+at all, which looks like the CSS was deleted. Stop the dev server before
+building, and recover with `rm -rf web/.next` before starting it again.
 
 The backend test suite mocks Qdrant and embeddings (`tests/conftest.py`), so no
 running services or live API keys are needed. `git` pre-commit hooks are wired

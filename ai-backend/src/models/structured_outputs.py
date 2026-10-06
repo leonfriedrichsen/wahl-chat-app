@@ -101,9 +101,12 @@ class GroupChatTitleQuickReplyGenerator(BaseModel):
     )
 
 
-class RerankingOutput(BaseModel):
-    """Output of the Reranking Model."""
+class PledgeRelevanceOutput(BaseModel):
+    """Output of the PledgeTracker relevance gate (chat time)."""
 
-    reranked_doc_indices: list[int] = Field(
-        description="Absteigend nach Nützlichkeit sortierte Liste der Indices der Dokumente"
+    relevant_indices: list[int] = Field(
+        description=(
+            "Nummern (1-basiert) der Kandidaten, die klar dasselbe Thema "
+            "behandeln wie das Nutzerthema. Leere Liste, wenn keiner passt."
+        )
     )

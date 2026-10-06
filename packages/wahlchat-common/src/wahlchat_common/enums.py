@@ -32,3 +32,4 @@ class SourceType(str, Enum):
     DRUCKSACHE = "drucksache"
     QA_TRANSCRIPT = "qa_transcript"
     PARLIAMENTARY_SPEECH = "parliamentary_speech"  # Bundestag plenary speeches
+    PLEDGE_RECORD = "pledge_record"  # PledgeTracker pledges (one vector per pledge)

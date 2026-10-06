@@ -103,6 +103,7 @@ from src.models.dtos import (
 from wahlchat_common.embeddings import get_embeddings
 from src.models.context import ContextParty
 from src.models.party import WAHL_CHAT_PARTY
+from src.pledge_tracker_service import aretrieve_pledge_tracker_suggestions
 from src.prompts import (
     RAG_QUERY_SOURCE_FILTER_NOTE_DE,
     build_prompt_context,
@@ -122,10 +123,7 @@ from src.utils import (
 
 # Query-side embeddings client, resolved via the provider factory. RETRIEVAL_QUERY
 # mirrors retrieve.py: corpus passages are embedded as RETRIEVAL_DOCUMENT, so the
-# query must use the asymmetric query space (Gemini; no-op for OpenAI). Resolved
-# here directly — NOT via vector_store_helper, whose module-level vector stores
-# require the legacy V1 collections to exist in Qdrant (a fresh V2 store with only
-# wahlchat_chunks_{env} would fail at import).
+# query must use the asymmetric query space (Gemini; no-op for OpenAI).
 embed = get_embeddings(task_type="RETRIEVAL_QUERY")
 
 MAX_RESPONSE_CHUNK_LENGTH = 10  # preserved from V1 for cached-response replay
@@ -434,12 +432,58 @@ def _party_chunk(session_id: str, party_id: str, chunk: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# PledgeTracker lookup (best-effort side payload on party_complete)
+# ---------------------------------------------------------------------------
+async def _safe_pledge_tracker_payload(
+    *,
+    party: ContextParty,
+    context_id: str,
+    query: str,
+    region_path: Optional[List[str]] = None,
+    query_vector: Optional[list[float]] = None,
+):
+    """Best-effort PledgeTracker lookup: any failure returns None, never raises.
+
+    "Best-effort" covers failures, NOT latency. The caller awaits this before
+    emitting party_complete, so the lookup's cost (Qdrant search + relevance
+    gate + Firestore hydration) lands on that frame; the gate timeout bounds
+    the worst case. It is off the token-streaming path, not off the answer path.
+
+    ``region_path`` is the stream-level value fetched once in
+    generate_chat_stream — passed through so the pledge filter shares the
+    region scope of every other retrieve() call instead of re-deriving it.
+    ``context_id`` is only for logging.
+    """
+    if party.party_id == WAHL_CHAT_PARTY.party_id:
+        return None
+
+    try:
+        return await aretrieve_pledge_tracker_suggestions(
+            query=query,
+            party_id=party.party_id,
+            region_path=region_path,
+            query_vector=query_vector,
+            limit=3,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "PledgeTracker lookup failed (party=%s context=%s): %s",
+            party.party_id,
+            context_id,
+            exc,
+            exc_info=True,
+        )
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Cached-response yielder (replaces emit_cached_party_response)
 # ---------------------------------------------------------------------------
 async def yield_cached_party_response(
     party: ContextParty,
     group_chat_session: GroupChatSession,
     cached_response: CachedResponse,
+    region_path: Optional[List[str]] = None,
 ) -> AsyncGenerator[str, None]:
     """Yield SSE events for a cached party response (simulated streaming).
 
@@ -481,12 +525,23 @@ async def yield_cached_party_response(
     )
     group_chat_session.chat_history.append(chatbot_message)
 
+    # Cached replays recompute pledge suggestions: pledge payloads are never
+    # answer-cached, so timelines stay as fresh as the pledge store.
+    pledge_query = " ".join(cached_response.rag_query or []) or full_response[:500]
+    pledge_tracker = await _safe_pledge_tracker_payload(
+        party=party,
+        context_id=group_chat_session.context_id,
+        query=pledge_query,
+        region_path=region_path,
+    )
+
     party_response_complete_dto = PartyResponseCompleteDto(
         session_id=group_chat_session.session_id,
         party_id=party.party_id,
         complete_message=full_response,
         message_id=message_id,
         status=Status(indicator=StatusIndicator.SUCCESS, message="Success"),
+        pledge_tracker=pledge_tracker,
     )
     yield _data_event(
         {"type": "party_complete", **party_response_complete_dto.model_dump()},
@@ -596,13 +651,13 @@ async def _safe_retrieve(  # type: ignore[no-untyped-def]
     _failures: Optional[list] = None,
     **kwargs,
 ) -> list[dict]:
-    """Run retrieve() off-thread; a failure returns [] so one source never kills
+    """Await retrieve(); a failure returns [] so one source never kills
     its siblings. The failure is RECORDED in *_failures* (when given) so the
     caller can distinguish "empty corpus" from "every source errored" — a total
     outage must fail the turn, not stream an ungrounded answer.
     with_scores is never set here → list[dict]."""
     try:
-        return cast(list[dict], await asyncio.to_thread(retrieve, *args, **kwargs))
+        return cast(list[dict], await retrieve(*args, **kwargs))
     except Exception as _err:  # noqa: BLE001
         logger.warning(
             "%s() failed (source=%s party=%s): %s",
@@ -624,11 +679,11 @@ async def _safe_two_pass(
     _failures: Optional[list] = None,
     **kwargs,
 ) -> dict[str, list[dict]]:  # type: ignore[no-untyped-def]
-    """Run retrieve_two_pass() off-thread; a failure returns empty current/historic
+    """Await retrieve_two_pass(); a failure returns empty current/historic
     buckets so a single source failure never kills the other two. The failure is
     recorded in *_failures* (when given) — see _safe_retrieve."""
     try:
-        return await asyncio.to_thread(retrieve_two_pass, improved_rag_query, **kwargs)
+        return await retrieve_two_pass(improved_rag_query, **kwargs)
     except Exception as _err:  # noqa: BLE001
         logger.warning(
             "%s() failed (source=%s party=%s): %s",
@@ -1183,7 +1238,7 @@ async def fetch_party_response_stream(
                 if cached_answer_to_emit is not None:
                     logger.info(f"Serving cached response for party {party.party_id}")
                     async for event in yield_cached_party_response(
-                        party, group_chat_session, cached_answer_to_emit
+                        party, group_chat_session, cached_answer_to_emit, region_path
                     ):
                         yield event
                     return
@@ -1317,12 +1372,29 @@ async def fetch_party_response_stream(
         )
         group_chat_session.chat_history.append(chatbot_message)
 
+        # Best-effort pledge suggestions, reusing the answer's RAG query (and
+        # its already-computed embedding when this is not a comparison turn).
+        pledge_tracker = None
+        if not is_comparing_question:
+            pledge_tracker = await _safe_pledge_tracker_payload(
+                party=party,
+                context_id=group_chat_session.context_id,
+                query=(
+                    improved_rag_query_list[0]
+                    if improved_rag_query_list
+                    else question_for_party
+                ),
+                region_path=region_path,
+                query_vector=rag_query_vector,
+            )
+
         party_response_complete_dto = PartyResponseCompleteDto(
             session_id=group_chat_session.session_id,
             party_id=party.party_id,
             complete_message=full_response_text,
             message_id=message_id,
             status=Status(indicator=StatusIndicator.SUCCESS, message="Success"),
+            pledge_tracker=pledge_tracker,
         )
         yield _data_event(
             {"type": "party_complete", **party_response_complete_dto.model_dump()},

@@ -5,9 +5,9 @@
 """
 Embeddings provider factory — single construction site for the embedding client.
 
-Every place that needs an embeddings client (retrieve(), chat_service,
-and the legacy vector_store_helper) resolves it through ``get_embeddings()`` so
-the provider can be swapped by configuration alone, without editing code.
+Every place that needs an embeddings client (the ingestion runner and
+retrieve()) resolves it through ``get_embeddings()`` so the provider can be
+swapped by configuration alone, without editing code.
 
 Configuration (all optional; the defaults reproduce the current behaviour
 EXACTLY — with no env set this returns ``gemini-embedding-2`` @ 3072):
@@ -21,7 +21,7 @@ EXACTLY — with no env set this returns ``gemini-embedding-2`` @ 3072):
                        per-vector dimension guard (_upsert_chunks).
 
 Model and dimension default to ``EMBEDDING_MODEL`` / ``EMBEDDING_DIM`` in
-``src.corpus`` — the canonical vector-space definition — so
+``wahlchat_common.corpus`` — the canonical vector-space definition — so
 they stay in lockstep with the collection the vectors are written to.
 
 Gemini reads its key from ``GOOGLE_API_KEY`` (falling back to ``GEMINI_API_KEY``)
@@ -30,7 +30,7 @@ does today.
 
 Gemini transport (AI Studio vs Vertex AI) is chosen separately from the provider
 string. When a Vertex service-account key is configured (see
-``src/vertex_credentials.py``) the Gemini client is built against Vertex so the
+``wahlchat_common.vertex_credentials``) the Gemini client is built against Vertex so the
 spend lands on the billing project; ``EMBEDDINGS_USE_VERTEX=0`` forces AI Studio.
 The provider string stays ``"gemini"`` either way — it names the vector space,
 which is identical across both backends, and it is stamped into the Qdrant

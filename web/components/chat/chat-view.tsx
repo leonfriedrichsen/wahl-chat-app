@@ -1,4 +1,5 @@
 import ChatProlificWrapper from '@/components/chat/chat-prolific-wrapper';
+import ChatStudyWrapper from '@/components/chat/chat-study-wrapper';
 import AiDisclaimer from '@/components/legal/ai-disclaimer';
 import LoadingSpinner from '@/components/loading-spinner';
 import { DEFAULT_CONTEXT_ID } from '@/lib/constants';
@@ -15,6 +16,7 @@ type Props = {
   sessionId?: string;
   partyIds?: string[];
   initialQuestion?: string;
+  prefilledQuestion?: string;
   contextId?: string;
 };
 
@@ -22,6 +24,7 @@ async function ChatView({
   sessionId,
   partyIds,
   initialQuestion,
+  prefilledQuestion,
   contextId = DEFAULT_CONTEXT_ID,
 }: Props) {
   const systemStatus = await getSystemStatus();
@@ -43,12 +46,14 @@ async function ChatView({
           chatSessionId={sessionId}
           partyIds={partyIds}
           initialQuestion={initialQuestion}
+          prefilledQuestion={prefilledQuestion}
           contextId={contextId}
         />
       </Suspense>
 
       <div className="relative px-3 md:px-4">
         <ChatProlificWrapper />
+        <ChatStudyWrapper />
         <ChatScrollDownIndicator />
         <ChatDynamicChatInput
           initialSystemStatus={systemStatus}

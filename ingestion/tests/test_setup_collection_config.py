@@ -3,20 +3,15 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
 """
-Config-resolution tests for setup_collection.
+Tests for collection name, model, and dimension.
 
-The collection name, embedding model and embedding dimension are read from env
-at import time so a second vector space (e.g. a parallel Gemini collection) can
-be created alongside the existing one without editing code. With no env set the
-defaults must remain the deployed gemini-embedding-2 @ 3072 space.
-
-The constants themselves live in ``ingestion.corpus`` (shared verbatim with the
-backend) and are re-exported here, so BOTH modules are reloaded: reloading only
-setup_collection would re-import the already-cached corpus values and observe no
-change.
-
-These tests reload under a patched environment and restore in a finally block so
-no other test observes the overridden values.
+Those values are read from the environment at import time.
+With no variables set, the defaults are gemini-embedding-2 and 3072 dimensions.
+The constants live in ``wahlchat_common.corpus``.
+``setup_collection`` re-exports them.
+These tests reload both modules.
+A reload of ``setup_collection`` alone keeps the cached corpus values.
+Each test restores the modules in a ``finally`` block.
 """
 
 from __future__ import annotations
@@ -48,7 +43,7 @@ def test_defaults_unchanged_with_no_env(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 def test_name_model_and_dim_come_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A parallel Gemini collection can be defined entirely via env."""
+    """Environment variables set the collection name, model, and dimension."""
     monkeypatch.setenv("COLLECTION_NAME", "wahlchat_chunks_gemini_dev")
     monkeypatch.setenv("EMBEDDING_MODEL", "gemini-embedding-001")
     monkeypatch.setenv("EMBEDDING_DIM", "3072")

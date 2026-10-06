@@ -3,38 +3,32 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
 """
-Embeddings provider factory — single construction site for the embedding client.
+Factory for the embedding client.
 
-Every place that needs an embeddings client (the ingestion runner and
-retrieve()) resolves it through ``get_embeddings()`` so the provider can be
-swapped by configuration alone, without editing code.
+The ingestion runner and ``retrieve()`` call ``get_embeddings()``.
+Set ``EMBEDDING_PROVIDER`` to select the client.
 
-Configuration (all optional; the defaults reproduce the current behaviour
-EXACTLY — with no env set this returns ``gemini-embedding-2`` @ 3072):
+Defaults when the variables are unset:
 
-  EMBEDDING_PROVIDER   "openai" (default) | "gemini"
-  EMBEDDING_MODEL      embedding model name — defaults to setup_collection's
-                       value (the locked vector-space source of truth)
-  EMBEDDING_DIM        output dimension — defaults to setup_collection's value;
-                       forwarded to Gemini as ``output_dimensionality`` so the
-                       vector width matches the collection and run.py's
-                       per-vector dimension guard (_upsert_chunks).
+  EMBEDDING_PROVIDER   gemini
+  EMBEDDING_MODEL      gemini-embedding-2
+  EMBEDDING_DIM        3072
 
-Model and dimension default to ``EMBEDDING_MODEL`` / ``EMBEDDING_DIM`` in
-``wahlchat_common.corpus`` — the canonical vector-space definition — so
-they stay in lockstep with the collection the vectors are written to.
+Model and dimension come from ``wahlchat_common.corpus``.
+The fingerprint stores the same provider, model, and dimension.
 
-Gemini reads its key from ``GOOGLE_API_KEY`` (falling back to ``GEMINI_API_KEY``)
-for AI Studio access; OpenAI reads ``OPENAI_API_KEY`` from the environment as it
-does today.
+``EMBEDDING_PROVIDER`` accepts ``gemini`` or ``openai``.
+Gemini receives ``EMBEDDING_DIM`` as ``output_dimensionality``.
+The runner rejects a vector whose width does not match the collection.
 
-Gemini transport (AI Studio vs Vertex AI) is chosen separately from the provider
-string. When a Vertex service-account key is configured (see
-``wahlchat_common.vertex_credentials``) the Gemini client is built against Vertex so the
-spend lands on the billing project; ``EMBEDDINGS_USE_VERTEX=0`` forces AI Studio.
-The provider string stays ``"gemini"`` either way — it names the vector space,
-which is identical across both backends, and it is stamped into the Qdrant
-embedding-space fingerprint that ``setup_collection.check_fingerprint`` enforces.
+Gemini reads ``GOOGLE_API_KEY``, then ``GEMINI_API_KEY``.
+OpenAI reads ``OPENAI_API_KEY``.
+
+Vertex AI is a transport for the same vector space.
+When Vertex credentials exist, the Gemini client uses Vertex.
+Set ``EMBEDDINGS_USE_VERTEX=0`` to use AI Studio.
+The provider string stays ``gemini`` on both transports.
+``wahlchat_common.corpus.check_fingerprint`` compares the provider, not the transport.
 """
 
 from __future__ import annotations
@@ -44,19 +38,19 @@ from typing import Optional
 
 from langchain_core.embeddings import Embeddings
 
-from wahlchat_common.corpus import EMBEDDING_DIM, EMBEDDING_MODEL
-
-_DEFAULT_PROVIDER = "openai"
+from wahlchat_common.corpus import (
+    EMBEDDING_DIM,
+    EMBEDDING_MODEL,
+    resolve_embedding_provider,
+)
 
 
 def _vertex_embeddings_requested() -> bool:
-    """Whether Gemini embeddings should be routed through Vertex AI.
+    """Return True when Gemini embeddings must use Vertex AI.
 
-    Opt-out rather than opt-in: when Vertex credentials are configured at all,
-    embeddings follow chat onto the billing project. ``EMBEDDINGS_USE_VERTEX=0``
-    forces them back to AI Studio — the manual kill-switch, since embeddings have
-    no runtime failover (clients are bound once at module level in
-    ``src/chat_service.py`` and ``src/retrieve.py``).
+    Credentials select Vertex. ``EMBEDDINGS_USE_VERTEX=0`` selects AI Studio.
+    The chat service and ``retrieve()`` create the client once.
+    A change of this variable applies after the process starts again.
     """
     return os.getenv("EMBEDDINGS_USE_VERTEX", "1").strip().lower() not in (
         "0",
@@ -75,21 +69,18 @@ def get_embeddings(
     """Return a LangChain embeddings client selected by configuration.
 
     Args:
-        provider: Override the ``EMBEDDING_PROVIDER`` env value. When None the env
-                  is read, defaulting to ``"openai"`` (current behaviour).
-        model:    Override the embedding model name. When None it defaults to
-                  ``EMBEDDING_MODEL`` (env-overridable via setup_collection).
-        output_dimensionality: Override the vector dimension. When None it
-                  defaults to ``EMBEDDING_DIM``. Only meaningful for Gemini, where
-                  it is forwarded as ``output_dimensionality`` so the produced
-                  vectors match the collection width.
-        task_type: Gemini-only optimisation axis — how the embedding will be USED,
-                  not a data format. Corpus passages (written by the ingestion
-                  package) are embedded with ``"RETRIEVAL_DOCUMENT"``; the search
-                  query here (retrieve()) must
-                  pass ``"RETRIEVAL_QUERY"``. The asymmetric document/query spaces
-                  materially improve retrieval. Ignored for OpenAI (no such axis).
-                  Baked into the vectors → set it correctly BEFORE ingesting.
+        provider: Override ``EMBEDDING_PROVIDER``.
+                  When None, ``resolve_embedding_provider()`` supplies the value.
+                  The default is ``gemini``.
+        model:    Override the model name. When None, use ``EMBEDDING_MODEL``.
+        output_dimensionality: Override the vector width.
+                  When None, use ``EMBEDDING_DIM``.
+                  Gemini receives this value as ``output_dimensionality``.
+        task_type: Gemini only. This value selects the embedding use.
+                  Corpus passages use ``RETRIEVAL_DOCUMENT``.
+                  ``retrieve()`` passes ``RETRIEVAL_QUERY`` for the search query.
+                  OpenAI ignores this argument.
+                  The value is part of the vector. Set it before ingestion.
 
     Returns:
         An ``Embeddings`` instance for the resolved provider.
@@ -98,13 +89,9 @@ def get_embeddings(
         ValueError: If the resolved provider is neither "openai" nor "gemini".
     """
     resolved_provider = (
-        (
-            provider
-            if provider is not None
-            else os.getenv("EMBEDDING_PROVIDER", _DEFAULT_PROVIDER)
-        )
-        .strip()
-        .lower()
+        provider.strip().lower()
+        if provider is not None
+        else resolve_embedding_provider()
     )
     resolved_model = model if model is not None else EMBEDDING_MODEL
     resolved_dim = (
@@ -112,31 +99,22 @@ def get_embeddings(
     )
 
     if resolved_provider == "openai":
-        # Default path — byte-for-byte the previous construction. The API key is
-        # read from OPENAI_API_KEY by OpenAIEmbeddings itself, unchanged.
+        # OpenAIEmbeddings reads OPENAI_API_KEY from the environment.
         from langchain_openai import OpenAIEmbeddings  # noqa: PLC0415
 
         return OpenAIEmbeddings(model=resolved_model)
 
     if resolved_provider == "gemini":
-        # AI Studio access: GOOGLE_API_KEY is the primary name (matches llms.py);
-        # GEMINI_API_KEY is accepted as an alias. output_dimensionality pins the
-        # vector width to the collection so run.py's dimension guard passes.
-        #
-        # Imports stay INSIDE the branch: tests/test_embeddings.py patches
-        # GoogleGenerativeAIEmbeddings at its import source, which only works
-        # while this import is lazy.
+        # Import inside this branch.
+        # Tests patch GoogleGenerativeAIEmbeddings on its source module.
+        # A top-level import would bind the class before the patch.
         from langchain_google_genai import (  # noqa: PLC0415
             GoogleGenerativeAIEmbeddings,
         )
 
-        # Transport selection is deliberately INDEPENDENT of the provider string.
-        # "gemini" names the VECTOR SPACE, and that space is unchanged: Vertex and
-        # AI Studio serve the same model at the same dimension, only billing
-        # differs. The provider string is stamped into the Qdrant embedding-space
-        # fingerprint (setup_collection.expected_fingerprint) and
-        # check_fingerprint() raises on any mismatch — encoding transport in it
-        # would reject the existing corpus and force a full re-ingest.
+        # "gemini" names the vector space, not the transport.
+        # Vertex and AI Studio use the same model and the same dimension.
+        # The fingerprint stores the provider. It does not store the transport.
         from wahlchat_common.vertex_credentials import (  # noqa: PLC0415
             get_vertex_credentials,
             vertex_enabled,
@@ -144,22 +122,22 @@ def get_embeddings(
             vertex_project,
         )
 
-        # The kill-switch is checked FIRST and that ordering is load-bearing:
-        # short-circuiting means EMBEDDINGS_USE_VERTEX=0 never touches the
-        # credential resolver, so deliberately opting out cannot trip a
-        # misconfiguration warning — or, under VERTEX_REQUIRED, a raise.
+        # Check the kill switch first.
+        # EMBEDDINGS_USE_VERTEX=0 must not call the credential resolver.
+        # A call would log a misconfiguration, or raise when VERTEX_REQUIRED is set.
         if _vertex_embeddings_requested() and vertex_enabled():
             return GoogleGenerativeAIEmbeddings(
                 model=resolved_model,
                 output_dimensionality=resolved_dim,
                 task_type=task_type,
-                # Pinned on both paths — see _gemini() in src/llms.py for why
-                # leaving this to inference is not safe in either direction.
+                # Set vertexai on both paths.
+                # The client also reads GOOGLE_GENAI_USE_VERTEXAI.
+                # That variable overrides inference from credentials.
+                # An explicit value prevents the override.
                 vertexai=True,
                 credentials=get_vertex_credentials(),
-                # NOTE: unlike the chat class, GoogleGenerativeAIEmbeddings does
-                # NOT derive `project` from the credentials object. vertex_enabled()
-                # has already established that this resolves to a real value.
+                # GoogleGenerativeAIEmbeddings does not read project from credentials.
+                # vertex_enabled() has already required a project id.
                 project=vertex_project(),
                 location=vertex_location(),
             )
@@ -170,7 +148,7 @@ def get_embeddings(
             output_dimensionality=resolved_dim,
             google_api_key=api_key,
             task_type=task_type,
-            vertexai=False,  # safety pin — see _gemini() in src/llms.py
+            vertexai=False,
         )
 
     raise ValueError(

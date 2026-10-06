@@ -72,12 +72,11 @@ def _get_qdrant() -> AsyncQdrantClient:
 
 
 def _get_embed() -> Embeddings:
-    """Return the module-level embedding model, initializing on first call.
+    """Return the module-level embedding model. Create it on the first call.
 
-    Deferred initialization avoids raising a provider error at import time when
-    the provider's API key is not set (e.g. in CI or test environments that
-    override the embed callable via _embed_fn). The concrete provider is resolved
-    by get_embeddings() from EMBEDDING_PROVIDER (default OpenAI — unchanged).
+    Import does not fail when the API key is absent.
+    Tests replace the embed function through ``_embed_fn``.
+    ``get_embeddings()`` reads ``EMBEDDING_PROVIDER``. The default provider is gemini.
     """
     global _embed
     if _embed is None:

@@ -45,6 +45,6 @@ WORKDIR /app/ai-backend
 ENV PATH="/app/.venv/bin:$PATH"
 USER appuser
 
-# Single role: the FastAPI chat service. Ingestion is a separate image, so a
-# job spec can no longer boot this by mistake and vice versa.
+# This image runs the chat API only.
+# Ingestion runs from its own image.
 ENTRYPOINT ["sh", "-c", "exec python -m src.app --host 0.0.0.0 --port ${PORT:-8080}"]

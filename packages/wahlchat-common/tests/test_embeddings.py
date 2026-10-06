@@ -39,17 +39,26 @@ def patched_clients(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def test_defaults_to_openai(
+def test_defaults_to_gemini(
     monkeypatch: pytest.MonkeyPatch, patched_clients: None
 ) -> None:
-    """With no EMBEDDING_PROVIDER set the factory returns the OpenAI client
-    built with the locked default model — the current behaviour, unchanged."""
+    """With EMBEDDING_PROVIDER unset, the factory returns the Gemini client.
+
+    The model is EMBEDDING_MODEL (gemini-embedding-2).
+    The dimension is EMBEDDING_DIM (3072).
+    """
     monkeypatch.delenv("EMBEDDING_PROVIDER", raising=False)
+    monkeypatch.setenv("EMBEDDINGS_USE_VERTEX", "0")
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-google-key")
 
     client = emb.get_embeddings()
 
-    assert isinstance(client, _FakeOpenAI)
-    assert client.kwargs == {"model": EMBEDDING_MODEL}
+    assert isinstance(client, _FakeGemini)
+    assert client.kwargs["model"] == EMBEDDING_MODEL
+    assert client.kwargs["output_dimensionality"] == EMBEDDING_DIM
+    assert client.kwargs["google_api_key"] == "test-google-key"
+    assert client.kwargs["vertexai"] is False
+    assert client.kwargs["task_type"] is None
 
 
 def test_gemini_when_provider_is_gemini(
@@ -108,7 +117,7 @@ def test_unknown_provider_raises(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_explicit_overrides_win_over_env(
     monkeypatch: pytest.MonkeyPatch, patched_clients: None
 ) -> None:
-    """Explicit args take precedence over env (still defaults, decision-free)."""
+    """An explicit argument overrides the environment variable."""
     monkeypatch.setenv("EMBEDDING_PROVIDER", "openai")
     monkeypatch.setenv("GOOGLE_API_KEY", "test-google-key")
 

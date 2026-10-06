@@ -236,10 +236,9 @@ def test_strict_mode_raises_on_every_misconfiguration(
 def test_credentials_without_resolvable_project_warns(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, no_vertex_env
 ) -> None:
-    """The third silent path: a key that loads but yields no project id.
+    """A key that loads but has no project id is a configuration error.
 
-    vertex_project() returns None, so VERTEX_AVAILABLE ends up False in
-    ai-backend/src/llms.py — previously with nothing logged anywhere.
+    ``vertex_enabled()`` returns False and logs a warning.
     """
     monkeypatch.setattr(gc, "get_vertex_credentials", lambda: _KeyWithoutProject())
 

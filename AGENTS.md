@@ -40,29 +40,25 @@ Three deployable components (four images) plus two data stores:
 - **`ai-backend/`** — Python FastAPI service (ASGI, uvicorn). Serves the chat
   RAG pipeline over Server-Sent Events, including query-time retrieval
   (`src/retrieve.py`).
-- **`ingestion/`** — the corpus layer as its own Python package: connectors and
-  runner, Qdrant collection setup, the embeddings factory. Deploys as a separate
-  image for the scheduled Cloud Run Jobs.
+- **`ingestion/`** — connectors, the runner, and Qdrant collection setup.
+  This package is a separate image for the scheduled Cloud Run Jobs.
 
-**The two deployables never import each other.** Whatever they share lives in a
-third package, `packages/wahlchat-common`:
+**The two deployables do not import each other.** Shared code is in
+`packages/wahlchat-common`:
 
     ai-backend  ->  wahlchat-common  <-  ingestion
 
-Today that is the corpus contract — vector space and collection identity, the
-embeddings factory, payload enums, governance levels, the 36 AW legislature
-periods — plus Vertex credential resolution. Anything else the components come to
-share belongs here too (the Firebase functions are Python and could join).
+The package holds the corpus contract: vector space, collection name, the
+embedding factory, payload enums, governance levels, the 36 AW legislature
+periods, PledgeTracker record types, and Vertex credentials.
+Put further shared code in this package.
 
-Every dependency it declares is already a direct dependency of both consumers, so
-it adds nothing to either image. Keep it that way: a heavy dependency added for
-one consumer lands in every image.
+Every dependency of the package is already a direct dependency of both images.
+A new dependency here is installed in both images.
 
-Sharing the code removes source drift by construction. **Deployment** drift it
-cannot remove: the service and the Job get their env separately, so one could run
-a different `EMBEDDING_MODEL` than the other. That is what `check_fingerprint()`
-is for — the provider/model/dim that produced the vectors is stored in the
-collection and verified on read and on write.
+The chat service and the ingestion Job receive environment variables separately.
+`check_fingerprint()` compares the stored provider, model, and dimension with
+the running process. The comparison runs on read and on write.
 
 All three are uv workspace members sharing one lockfile. `--package` in each
 Dockerfile installs one deployable plus `wahlchat-common`, and nothing else.
@@ -147,12 +143,12 @@ Outside the registry (bespoke runner, like the manifesto bulk CLIs):
   `ingestion/src/ingestion/connectors/pledgetracker/bulk.py` (see "Running
   PledgeTracker ingestion").
 
-The **data contract** is the Pydantic model set in
-`ingestion/src/ingestion/schemas.py`
-(`ChunkRecord` plus the `AuthorityTier` / `SourceType` enums and per-source
-`meta` builders `VoteMeta` / `SpeechMeta`). It is the single source of truth for
-what a corpus chunk looks like; connectors produce `ChunkRecord`s and the runner
-stores them.
+The **data contract** for a corpus chunk is `ChunkRecord` and the per-source
+`meta` builders (`VoteMeta`, `SpeechMeta`) in
+`ingestion/src/ingestion/schemas.py`.
+`AuthorityTier` and `SourceType` are defined in `wahlchat_common.enums`.
+`schemas.py` re-exports them.
+Connectors produce `ChunkRecord`s. The runner stores them.
 
 ### Qdrant collection design
 
@@ -542,19 +538,16 @@ The two stores are seeded by different mechanisms, on purpose:
   `EMBEDDING_DIM` / `EMBEDDING_MODEL` in `wahlchat_common.corpus` (re-exported
   by `setup_collection.py`) as immutable after the first run.
 
-  A collection name cannot prove which model produced its vectors, and OpenAI's
-  `text-embedding-3-large` is also 3072-dimensional, so the dimension guard
-  alone would pass on a mixed store. Every read and write therefore calls
-  `check_fingerprint()` (async `acheck_fingerprint()` on the chat path), which
-  compares the collection's recorded provider/model/dim against the running
-  configuration and raises on a mismatch. That guard is what keeps the two
-  packages honest across the split — it lives in `wahlchat_common.corpus`, not
-  in either deployable.
-
-  Note that `get_embeddings()` still falls back to OpenAI when
-  `EMBEDDING_PROVIDER` is unset, so `ai-backend/.env` (or `ingestion/.env`)
-  must set it — copy `.env.example`. Without it, ingestion and retrieval fail
-  at the fingerprint check rather than reading the corpus.
+  A collection name does not record which model produced its vectors.
+  OpenAI `text-embedding-3-large` is also 3072-dimensional.
+  The dimension check accepts both spaces.
+  Every read and every write calls `check_fingerprint()`
+  (`acheck_fingerprint()` on the chat path).
+  The check compares the stored provider, model, and dimension with the running
+  process and raises on a mismatch.
+  The check lives in `wahlchat_common.corpus`.
+  The default provider is `gemini` and the default model is `gemini-embedding-2`.
+  Set `EMBEDDING_PROVIDER=openai` only for a collection that was written with OpenAI.
 - **The corpus is source-cited.** Chunks carry `citation_url` / `citation_title`
   and an `authority_tier` (`authoritative` | `factual_record` | `self_reported`
   | `promotional`). Preserve citations end-to-end; answers are grounded in

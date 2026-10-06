@@ -53,19 +53,18 @@ from datetime import date as date_type
 from pathlib import Path
 from typing import Optional
 
-# CLI startup ONLY: load ingestion/.env BEFORE the imports below — embeddings
-# and setup_collection freeze EMBEDDING_MODEL / EMBEDDING_DIM / COLLECTION_NAME
-# from the environment at import time, so a later load_dotenv() configures
-# nothing. override=False keeps explicitly-exported shell env (QDRANT_URL,
-# ENV, …) authoritative — a `make run-manifestos QDRANT_URL=… ENV=prod`
-# invocation must never be silently redirected to the local .env store.
+# Load the env file before the imports below.
+# EMBEDDING_MODEL, EMBEDDING_DIM, and COLLECTION_NAME are read at import time.
+# A later load_dotenv() does not change those values.
+# override=False: an exported variable stays in force.
+# `make run-manifestos QDRANT_URL=… ENV=prod` must keep those values.
 if __name__ == "__main__":
     from dotenv import load_dotenv
 
     _env_path = Path(__file__).resolve().parents[4] / ".env"
 
-    # Fall back to ai-backend/.env so setups that keep every key in one
-    # file keep working after the ingestion split.
+    # Use ai-backend/.env when ingestion/.env does not exist.
+    # API keys can be in either file.
     if not _env_path.exists():
         _env_path = _env_path.parents[1] / "ai-backend" / ".env"
     if _env_path.exists():

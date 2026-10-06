@@ -6,38 +6,32 @@ SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
 # wahlchat-common
 
-Code shared by the Python components. `ai-backend` and `ingestion` both depend on
-it; **neither depends on the other**.
+Code shared by `ai-backend` and `ingestion`.
+Each image depends on this package. Neither image depends on the other.
 
-Today that is the corpus contract plus Vertex credentials:
-
-| Module | What it holds |
+| Module | Contents |
 |---|---|
-| `corpus.py` | collection name, embedding constants, fingerprint read + verify |
-| `embeddings.py` | `get_embeddings()` — the factory both sides embed with |
-| `enums.py` | `SourceType` / `AuthorityTier` payload values |
+| `corpus.py` | collection name, embedding constants, fingerprint check |
+| `embeddings.py` | `get_embeddings()` |
+| `enums.py` | `SourceType` and `AuthorityTier` |
 | `governance_levels.py` | `ALL_LEVELS` and the level constants |
-| `legislature_config.py` | the 36 AW parliament periods + term-window derivation |
+| `legislature_config.py` | the 36 AW parliament periods |
+| `pledge_tracker.py` | `PledgeRecord` and `PledgeTimelineEvent` |
 | `vertex_credentials.py` | Vertex service-account resolution |
 
-Anything else the components come to share belongs here too — the Firebase
-functions are Python and could become a third consumer.
+Put further shared code in this package.
 
-## The one rule
+## Dependency rule
 
-Every dependency declared here is already a direct dependency of both consumers,
-so this package adds nothing to either Docker image. **Keep it that way.** A heavy
-dependency added for one consumer lands in every image that installs this package
-— which is the cost the split exists to avoid.
+Every dependency of this package is already a direct dependency of both images.
+A new dependency here is installed in both images.
 
-The write side (collection creation, index specs, `write_fingerprint`) stays in
-`ingestion/setup_collection.py`; query-time retrieval stays in
-`ai-backend/src/retrieve.py`.
+Collection creation stays in `ingestion/src/ingestion/setup_collection.py`.
+Query-time retrieval stays in `ai-backend/src/retrieve.py`.
 
-## Drift
+## Fingerprint
 
-Sharing the code removes source drift by construction. What it cannot remove is
-**deployment** drift: the chat service and the ingestion Job get their env
-separately, so one could run with a different `EMBEDDING_MODEL` than the other.
-That is what `check_fingerprint()` is for — the provider/model/dim that produced
-the vectors is stored in the collection and verified on read and on write.
+The chat service and the ingestion Job receive environment variables separately.
+One process can use a different `EMBEDDING_MODEL` than the other.
+`check_fingerprint()` stores the provider, model, and dimension in the collection.
+Read and write both compare that record with the running process.

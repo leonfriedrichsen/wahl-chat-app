@@ -14,28 +14,25 @@ Built with Qdrant, LangChain embeddings, and Pydantic. Dependencies are managed 
 **uv** — this package is a member of the workspace rooted at the repo's top-level
 `pyproject.toml`.
 
-The Pydantic models in `src/ingestion/schemas.py` are the single source of truth for
-the corpus data contract (chunk payloads, source items, authority tiers).
+`src/ingestion/schemas.py` defines `ChunkRecord` and the per-source `meta` models.
+`SourceType` and `AuthorityTier` live in `wahlchat_common.enums`.
+`schemas.py` re-exports them.
 
 ## Relationship to `ai-backend/`
 
-**The two packages are independent: neither imports the other.** That keeps this
-package's connector dependencies (trafilatura, pypdf, beautifulsoup4,
-google-cloud-storage) out of the chat image, and keeps the backend's web stack out
-of the Job image.
+This package does not import `ai-backend`. `ai-backend` does not import this package.
+Connector libraries stay out of the chat image.
+The chat web stack stays out of the Job image.
 
-Query-time retrieval is *not* here: `retrieve()` is a backend concern and lives in
-`ai-backend/src/retrieve.py`.
+Query-time retrieval is `ai-backend/src/retrieve.py`.
 
-What the two must agree on lives in
-[`packages/wahlchat-common`](../packages/wahlchat-common/README.md), which both
-import: the vector space and collection identity, the embeddings factory, the
-payload enums, governance levels, the AW legislature periods, and Vertex
-credentials. Neither deployable imports the other.
+Shared code is in
+[`packages/wahlchat-common`](../packages/wahlchat-common/README.md):
+vector space, collection name, the embedding factory, payload enums,
+governance levels, legislature periods, and Vertex credentials.
 
-Sharing the code removes source drift. **Deployment** drift it cannot: the
-service and the Job get their env separately, so `check_fingerprint()` still
-verifies at runtime that the vector space in use matches what wrote the corpus.
+The two images receive environment variables separately.
+`check_fingerprint()` compares the stored provider, model, and dimension with the running process.
 
 ## Setup
 

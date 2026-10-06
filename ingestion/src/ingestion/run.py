@@ -32,14 +32,13 @@ import sys
 import time
 from typing import NamedTuple, Optional
 
-# CLI startup ONLY: load ingestion/.env BEFORE the imports below — embeddings
-# and setup_collection freeze EMBEDDING_MODEL / EMBEDDING_DIM / COLLECTION_NAME
-# from the environment at import time, so a load_dotenv() after them configures
-# nothing (e.g. a Gemini .env would still run with the frozen OpenAI model
-# name). Library imports (tests, other modules) are side-effect free — this
-# block runs only under `python -m ingestion.run`. override=False keeps
-# explicitly-exported env (e.g. CONNECTOR_ID, QDRANT_URL) authoritative;
-# Cloud Run has no .env file, so the job-spec env passes through untouched.
+# Load the env file before the imports below.
+# EMBEDDING_MODEL, EMBEDDING_DIM, and COLLECTION_NAME are read at import time.
+# A later load_dotenv() does not change those values.
+# This block runs only for `python -m ingestion.run`.
+# A library import does not load an env file.
+# override=False: an exported variable stays in force.
+# Cloud Run has no .env file. The job environment stays in force.
 if __name__ == "__main__":
     from pathlib import Path
 
@@ -47,8 +46,8 @@ if __name__ == "__main__":
 
     _env_path = Path(__file__).resolve().parents[2] / ".env"
 
-    # Fall back to ai-backend/.env so setups that keep every key in one
-    # file keep working after the ingestion split.
+    # Use ai-backend/.env when ingestion/.env does not exist.
+    # API keys can be in either file.
     if not _env_path.exists():
         _env_path = _env_path.parents[1] / "ai-backend" / ".env"
     if _env_path.exists():

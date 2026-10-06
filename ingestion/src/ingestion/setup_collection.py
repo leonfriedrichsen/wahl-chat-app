@@ -3,36 +3,36 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
 """
-Create ``wahlchat_chunks_{env}`` with HNSW m=0/payload_m=16, 3072-dim COSINE
-vectors, and every payload index in ``_INDEX_SPECS`` — run BEFORE any upsert.
+Create ``wahlchat_chunks_{env}`` before any upsert.
+
+The collection uses HNSW ``m=0`` / ``payload_m=16``, 3072-dimension COSINE vectors,
+and every payload index in ``_INDEX_SPECS``.
 
     uv run python -m ingestion.setup_collection
 
-Re-running is idempotent: if the collection already exists, creation is
-skipped; index creation calls are always repeated (Qdrant overwrites
-identically-named indexes in-place, which is a no-op for the same params).
+A second run does not create the collection again.
+Index creation runs on every call. Qdrant replaces an index that has the same name.
 
-On success, prints a verification line and exits with code 0. Raises
-RuntimeError if any index is missing (should never happen after a
-successful first run).
+On success, the script prints a verification line and exits with code 0.
+It raises ``RuntimeError`` when an index is missing.
 
-EMBEDDING_DIM and EMBEDDING_MODEL are the canonical source of truth
-for the vector space; changing either would break index parity.
+``EMBEDDING_DIM`` and ``EMBEDDING_MODEL`` come from ``wahlchat_common.corpus``.
+A change of either value breaks index parity with the existing collection.
 
-This script NEVER touches the legacy V1 collections
-(``all_parties_*``, ``justified_voting_behavior_*``, etc.).
+This script does not write the legacy collections
+(``all_parties_*``, ``justified_voting_behavior_*``).
 """
 
 import os
 import sys
 from typing import Optional
 
-# CLI startup ONLY: load ingestion/.env BEFORE the constants below freeze
-# their env-derived values. Without this, `python -m ingestion.setup_collection`
-# (and `make bootstrap-collection`) resolves the built-in OpenAI defaults even
-# when .env configures Gemini — and would stamp/verify the WRONG
-# embedding-space fingerprint. Library imports stay side-effect free; exported
-# shell env keeps winning (override=False).
+# Load the env file before the constants below.
+# EMBEDDING_MODEL, EMBEDDING_DIM, and COLLECTION_NAME are read at import time.
+# A later load_dotenv() does not change them.
+# `python -m ingestion.setup_collection` and `make bootstrap-collection` need the file values.
+# A library import does not load an env file.
+# override=False: an exported variable stays in force.
 if __name__ == "__main__":
     from pathlib import Path
 
@@ -40,8 +40,8 @@ if __name__ == "__main__":
 
     _env_path = Path(__file__).resolve().parents[2] / ".env"
 
-    # Fall back to ai-backend/.env so setups that keep every key in one
-    # file keep working after the ingestion split.
+    # Use ai-backend/.env when ingestion/.env does not exist.
+    # API keys can be in either file.
     if not _env_path.exists():
         _env_path = _env_path.parents[1] / "ai-backend" / ".env"
     if _env_path.exists():
@@ -49,13 +49,9 @@ if __name__ == "__main__":
 
 from qdrant_client import QdrantClient, models
 
-# ---------------------------------------------------------------------------
-# The vector space, the collection name, and the fingerprint read/verify helpers
-# live in ingestion/corpus.py — duplicated verbatim in the backend, which has to
-# agree with them on every query. Only the WRITE side is here, and it is
-# re-exported so existing `from ingestion.setup_collection import ...` callers
-# (the runner, the connectors, the entrypoint) keep working unchanged.
-# ---------------------------------------------------------------------------
+# Collection name, vector size, and fingerprint checks are in wahlchat_common.corpus.
+# This module creates the collection and the payload indexes.
+# It re-exports the corpus names. Callers import them from this module.
 from wahlchat_common.corpus import (  # noqa: E402
     COLLECTION_NAME,
     EMBEDDING_DIM,

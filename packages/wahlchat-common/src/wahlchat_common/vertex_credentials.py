@@ -6,7 +6,7 @@
 
 The service-account key belongs to the BILLING project (a different GCP project
 than the one this service runs in). It must NEVER become ambient ADC:
-``src/firebase_service.py`` falls back to a bare ``initialize_app()`` when no
+``ai-backend/src/firebase_service.py`` falls back to a bare ``initialize_app()`` when no
 cert file is on disk — which is always the case in the image, since
 ``.dockerignore`` keeps keys out of the build context. Exporting
 ``GOOGLE_APPLICATION_CREDENTIALS`` here would therefore make firebase-admin
@@ -22,8 +22,8 @@ Two failure modes, deliberately treated differently:
 
 *Unconfigured* — no ``VERTEX_*`` credential source at all. The expected state in CI
 and local development. Resolves to ``None`` quietly, and the caller falls back to
-Google AI Studio (``GOOGLE_API_KEY``) — see ``src/llms.py`` and
-``ai-backend/src/embeddings.py``.
+Google AI Studio (``GOOGLE_API_KEY``). Chat clients are in
+``ai-backend/src/llms.py``. The embedding factory is ``wahlchat_common.embeddings``.
 
 *Misconfigured* — a source WAS supplied but is unusable (blank value, missing file,
 corrupt key, unresolvable project). That is operator error, and staying quiet about
@@ -31,10 +31,10 @@ it is the worst outcome available: the service keeps answering while Gemini spen
 keeps landing on the project this module exists to move it off. So it always logs a
 warning, and under ``VERTEX_REQUIRED`` it raises ``VertexConfigError`` instead.
 
-``VERTEX_REQUIRED`` is off by default: an import-time raise takes ``src/llms.py``
-down and with it the whole service, which must not be the default for a key that is
-optional. It is meant for deployed revisions, where a failed revision is strictly
-better than invisible mis-billing.
+``VERTEX_REQUIRED`` is off by default. An import-time raise stops
+``ai-backend/src/llms.py`` and the chat service with it. A missing key is valid
+in CI and in local development. Set the variable on a deployed revision.
+A failed revision is safer than spend on the wrong project.
 """
 
 from __future__ import annotations
@@ -199,16 +199,15 @@ def vertex_location() -> str:
 
 
 def vertex_enabled() -> bool:
-    """True when Vertex is fully configured (credentials AND a project).
+    """Return True when Vertex has credentials and a project id.
 
-    The single decision point for "is Vertex on" — ``src/llms.py`` and
-    ``ai-backend/src/embeddings.py`` both route through here rather than re-deriving the
-    two-part condition, so the semantics live in one place. Cheap to call: the
-    credential lookup is cached and the project lookup is an env read.
+    Chat clients and the embedding factory call this function.
+    Do not repeat the two checks at the call site.
+    The credential lookup is cached. The project lookup reads the environment.
 
-    Also closes the last silent gap: credentials that load fine but yield no
-    project id (a key without ``project_id``, ``VERTEX_PROJECT_ID`` unset) used
-    to disable Vertex with nothing logged anywhere.
+    A key with no project id is a configuration error.
+    This function logs that error and returns False.
+    Set ``VERTEX_PROJECT_ID``, or use a key that contains ``project_id``.
     """
     if get_vertex_credentials() is None:
         return False  # already reported by the resolver, quietly or otherwise

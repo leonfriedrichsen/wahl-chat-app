@@ -38,7 +38,10 @@ FINGERPRINT_SOURCE_TYPE: str = "corpus_fingerprint"
 
 
 def resolve_embedding_provider() -> str:
-    """Resolve EMBEDDING_PROVIDER the same way the embeddings factory does."""
+    """Return EMBEDDING_PROVIDER. The default is gemini.
+
+    ``get_embeddings()`` calls this function when the caller does not pass a provider.
+    """
     return os.getenv("EMBEDDING_PROVIDER", _DEFAULT_PROVIDER).strip().lower()
 
 
@@ -104,11 +107,11 @@ def _enforce_fingerprint(stored: Any, collection_name: str) -> None:
 
 
 def check_fingerprint(client: QdrantClient, collection_name: str) -> None:
-    """Best-effort fingerprint verification before writes/queries.
+    """Compare the stored fingerprint with this process before a write or a query.
 
-    Raises when a stored fingerprint CONTRADICTS the current config — the main
-    runtime guard against the two packages drifting apart. A missing fingerprint
-    or an unreachable client degrades to a pass.
+    The function raises when the stored provider, model, or dimension differs.
+    A missing fingerprint passes.
+    An unreachable client passes.
     """
     try:
         stored = read_fingerprint(client, collection_name)

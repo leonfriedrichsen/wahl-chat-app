@@ -562,8 +562,8 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
 
     _ENV_PATH = Path(__file__).resolve().parents[4] / ".env"
-    # Fall back to ai-backend/.env so setups that keep every key in one
-    # file keep working after the ingestion split.
+    # Use ai-backend/.env when ingestion/.env does not exist.
+    # API keys can be in either file.
     if not _ENV_PATH.exists():
         _ENV_PATH = _ENV_PATH.parents[1] / "ai-backend" / ".env"
     if _ENV_PATH.exists():

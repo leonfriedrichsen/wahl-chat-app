@@ -16,7 +16,8 @@ from src.models.chat import Message, Role
 from src.models.context import ContextParty
 from src.models.party import WAHL_CHAT_PARTY
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+# .env sits at the backend root (ai-backend/), above src/core/.
+BASE_DIR = Path(__file__).resolve().parents[2]
 EXPECTED_API_NAME = "wahl-chat-api"
 
 # Client-facing generic error text: internal exception details (str(e)) must

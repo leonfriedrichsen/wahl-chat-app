@@ -299,9 +299,8 @@ def patch_chat_io(monkeypatch: pytest.MonkeyPatch) -> None:
         _fake_awrite_llm_status,
     )
 
-    # LLM helper patches — patched at USE SITE in chat_service (not at definition
-    # site in chatbot_async) because chat_service imports the names directly:
-    #   from src.services.chat.chatbot_async import get_question_targets_and_type, ...
+    # Patched where the names are bound, not where they are defined: the chat
+    # service imports them, so a patch on the defining module would miss.
     monkeypatch.setattr(
         "src.services.chat.service.get_question_targets_and_type",
         _fake_get_question_targets,
@@ -320,8 +319,8 @@ def patch_chat_io(monkeypatch: pytest.MonkeyPatch) -> None:
         "src.services.chat.chatbot_async.aget_context_by_id",
         _fake_aget_context_by_id,
     )
-    # chat_service imports aget_context_by_id directly (region_path fetch at the
-    # top of generate_chat_stream) — without this use-site patch the smoke test
+    # The chat service imports aget_context_by_id directly (region_path fetch at
+    # the top of generate_chat_stream) — without this use-site patch the smoke test
     # makes a live Firestore call, which times out (~300s) in CI where no
     # emulator listens on FIRESTORE_EMULATOR_HOST.
     monkeypatch.setattr(

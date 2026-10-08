@@ -121,10 +121,11 @@ async def test_sse_routes_use_event_source_response_with_ping():
     off WebSockets). No custom heartbeat code exists anymore."""
     import inspect
 
+    import src.services.chat.service as chat_module
     from src.routes import chat as chat_route
 
     assert not hasattr(
-        __import__("src.services.chat.service", fromlist=["chat_service"]),
+        chat_module,
         "with_heartbeat",
     ), "custom heartbeat wrapper must be gone (EventSourceResponse ping owns it)"
     source = inspect.getsource(chat_route)

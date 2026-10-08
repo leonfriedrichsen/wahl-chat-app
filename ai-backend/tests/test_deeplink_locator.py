@@ -10,9 +10,8 @@ matching the model's quoted text and builds `video_uri#t={ts_start}`. Verbatim
 substring match wins; a fuzzy near-match still resolves; a no-match falls back
 to `sentence_map[0]["ts_start"]` and NEVER raises.
 
-The citation-refinement helpers live in `src.services.chat.deeplink`. The top-level
-`pytest.importorskip(...)` makes this file SKIP cleanly if that module fails to
-import, then runs the real assertions.
+The top-level `pytest.importorskip(...)` makes this file SKIP cleanly if the
+deeplink module fails to import, then runs the real assertions.
 """
 
 from __future__ import annotations

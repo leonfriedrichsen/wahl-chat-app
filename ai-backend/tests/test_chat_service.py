@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
 """
-Unit tests for additions to chat_service:
+Unit tests for the chat service:
   - Vote sources[] dict carries a structural 'region' marker
   - election_level / level kwarg is passed ONLY to vote_record
     _safe_retrieve calls, never to manifesto/speech calls.
@@ -33,7 +33,7 @@ from src.models.context import ContextParty
 def test_vote_sources_include_region() -> None:
     """The vote sources loop must append 'region' from the vote payload.
 
-    We replicate the sources-loop logic from chat_service.py and verify that
+    We replicate the vote-sources loop and verify that
     the appended dict carries a 'region' key sourced from vote_payload.get('region').
     """
     party_id = "spd"
@@ -56,7 +56,7 @@ def test_vote_sources_include_region() -> None:
         },
     }
 
-    # Replicate the sources loop from chat_service.py.
+    # Replicate the vote-sources loop.
     sources: list = []
     for vp in [vote_payload]:
         meta_vp = vp.get("meta") or {}

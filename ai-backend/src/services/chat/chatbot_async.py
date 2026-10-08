@@ -549,9 +549,9 @@ async def generate_streaming_chatbot_response(
     has_historic: bool = False,
     source_filter: Optional[List[str]] = None,
 ) -> AsyncIterator[BaseMessageChunk]:
-    # relevant_docs is combined_docs from chat_service.py (manifesto + vote +
-    # speech Documents); get_rag_context numbers them sequentially so the LLM
-    # cites every grounding source as a clean [N] integer ID.
+    # relevant_docs is the combined manifesto, vote, and speech Documents.
+    # get_rag_context numbers them sequentially so the LLM cites every
+    # grounding source as a clean [N] integer ID.
     rag_context = get_rag_context(relevant_docs)
 
     now = datetime.now()

@@ -3,9 +3,9 @@
 """
 SSE voting-behavior endpoint — POST /api/v1/voting-behavior.
 
-Streams v5 UI-message-stream parts (framing in src.core.sse): a ``data-chat_event``
-per vote (inner type "vote_result"), text-delta parts for the summary, a final
-``data-chat_event`` (inner type "voting_behavior_complete"), then finish + [DONE].
+Streams v5 UI-message-stream parts: a ``data-chat_event`` per vote (inner type
+"vote_result"), text-delta parts for the summary, a final ``data-chat_event``
+(inner type "voting_behavior_complete"), then finish + [DONE].
 
 vote_record chunks are retrieved from the single wahlchat_chunks_{ENV} store
 via retrieve(source_type="vote_record", ...) — NOT the legacy empty

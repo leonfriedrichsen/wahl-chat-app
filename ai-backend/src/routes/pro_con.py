@@ -5,7 +5,7 @@ SSE pro-con endpoint — POST /api/v1/pro-con.
 
 Streams a pro/con perspective as a v5 ``data-chat_event`` part (inner type
 "pro_con_result"), then finish + [DONE]. On error: a ``data-chat_event`` with
-inner type "error", then [DONE]. Framing helpers live in src.core.sse.
+inner type "error", then [DONE].
 """
 
 import logging

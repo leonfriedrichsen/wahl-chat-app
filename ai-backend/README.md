@@ -101,9 +101,9 @@ How it behaves:
 
 - Vertex models are registered **above** their AI Studio twins in
   `RESPONSE_GENERATION_LLMS` / `PRE_AND_POST_PROCESSING_LLMS`, so the existing
-  priority-based failover in `src/llms.py` tries Vertex first and falls through to
+  priority-based failover in `src/config/llms.py` tries Vertex first and falls through to
   the identical AI Studio model on any error.
-- `src/llms.py` logs one line at import saying which backend it came up on —
+- `src/config/llms.py` logs one line at import saying which backend it came up on —
   `Vertex AI enabled for Gemini: project=… location=…`, or a warning that Gemini
   traffic will bill AI Studio. **That line is how you confirm a deploy took**;
   without it the only symptom of a Vertex tier that failed to register is billing

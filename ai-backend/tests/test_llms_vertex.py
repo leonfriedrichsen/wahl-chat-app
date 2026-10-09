@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
 """
-Tests for the Vertex AI tier in src/llms.py.
+Tests for the Vertex AI tier of the LLM client.
 
 Two properties matter and neither needs a network or a real key:
 
@@ -14,7 +14,7 @@ Two properties matter and neither needs a network or a real key:
      existing priority-sorted failover in get_answer_from_llms and friends tries
      Vertex first and falls through to the identical AI Studio model on error.
 
-The conftest sets no VERTEX_* variables, so importing src.llms here exercises
+The conftest sets no VERTEX_* variables, so the import below exercises
 case (1) directly. Case (2) is asserted against the module's own construction
 helper rather than by re-importing with credentials, which would require a real
 key to build a client.
@@ -22,7 +22,7 @@ key to build a client.
 
 from __future__ import annotations
 
-from src import llms
+from src.config import llms
 
 
 def test_no_vertex_tier_without_credentials() -> None:

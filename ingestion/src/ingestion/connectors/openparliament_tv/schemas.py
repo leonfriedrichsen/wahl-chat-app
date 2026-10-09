@@ -33,8 +33,8 @@ class OpSpeechMeta(BaseModel):
     """Source-owned nested metadata for openparliament.tv parliamentary_speech chunks.
 
     Carries the video deep-link payload and the timed sentence map that the
-    second-pass citation locator (chat_service.py) uses to build
-    ``video_uri#t={ts_start}`` links, plus Bundestag/ODbL attribution.
+    second-pass citation locator uses to build ``video_uri#t={ts_start}``
+    links, plus Bundestag/ODbL attribution.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")

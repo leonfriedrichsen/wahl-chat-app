@@ -6,7 +6,7 @@
 Filtered retrieval over ``wahlchat_chunks_{ENV}`` by source_type, party_id
 (tenant), region (MatchAny), authority_tier, and publish_date.
 
-Standalone: does not import chat_service. Call ``retrieve()`` with a mocked
+Standalone: does not import the chat service. Call ``retrieve()`` with a mocked
 embed to test without a live Gemini call.
 
 Gemini tool declaration:
@@ -892,13 +892,13 @@ def get_gemini_tool_binding(llm: Any) -> Any:
 
     Usage::
 
-        from src.llms import google_gemini_3_6_flash
+        from src.config.llms import google_gemini_3_6_flash
         from src.retrieve import get_gemini_tool_binding
 
         llm_with_tools = get_gemini_tool_binding(google_gemini_3_6_flash)
 
     The tool declaration is standalone — this does NOT import or modify
-    chat_service.
+    the chat service.
 
     Args:
         llm: A ChatGoogleGenerativeAI instance (e.g. ``google_gemini_3_6_flash``).

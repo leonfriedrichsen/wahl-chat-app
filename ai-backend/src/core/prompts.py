@@ -141,12 +141,12 @@ def get_party_vote_behavior_summary_guidelines():
 # =============================================================================
 # Centralised German instruction fragments for the SINGLE-PARTY party answer's
 # four-section soft-lead-in shape, the always-when-present historic section, and
-# the conditional coverage-transparency line. These are
-# composed by chatbot_async._source_structure_note so ALL German wording lives
-# here in one reviewable place and is never hardcoded as answer text in
-# chat_service. Plain string constants (no PromptTemplate) — they are appended to
-# answer_guidelines, which is substituted as a literal value into the system
-# prompt (so the illustrative "[N]" citation markers are never re-parsed).
+# the conditional coverage-transparency line. These are composed by
+# _source_structure_note so ALL German wording lives here in one reviewable
+# place and is never hardcoded as answer text. Plain string constants (no
+# PromptTemplate) — they are appended to answer_guidelines, which is
+# substituted as a literal value into the system prompt (so the illustrative
+# "[N]" citation markers are never re-parsed).
 #
 # SOURCE_STRUCTURE_LEADINS_DE carries a single "{party_name}" placeholder that
 # _source_structure_note fills via str.format; the historic + coverage fragments

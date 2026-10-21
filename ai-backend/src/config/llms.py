@@ -184,14 +184,10 @@ if VERTEX_AVAILABLE:
 # ---------------------------------------------------------------------------
 # Pre- and post-processing. Use the lowest thinking setting.
 # Gemini 3.5 Flash-Lite rejects temperature. Set thinking_level.
-# Gemini 2.5 Flash-Lite has no thinking_level. Set thinking_budget to 0.
 # The other models use temperature 1.
 # ---------------------------------------------------------------------------
 google_gemini_3_1_flash_lite = _gemini(
     "gemini-3.1-flash-lite", temperature=1.0, thinking_level="minimal"
-)
-google_gemini_2_5_flash_lite = _gemini(
-    "gemini-2.5-flash-lite", temperature=1.0, thinking_budget=0
 )
 google_gemini_3_5_flash_lite = _gemini(
     "gemini-3.5-flash-lite", thinking_level="minimal"
@@ -203,7 +199,6 @@ openai_gpt_5_6_luna = _openai(
 PRE_AND_POST_PROCESSING_LLMS: list[LLM] = [
     _llm("google-gemini-3.1-flash-lite", google_gemini_3_1_flash_lite, 100),
     _llm("openai-gpt-5.6-luna", openai_gpt_5_6_luna, 90),
-    _llm("google-gemini-2.5-flash-lite", google_gemini_2_5_flash_lite, 80),
     _llm("google-gemini-3.5-flash-lite", google_gemini_3_5_flash_lite, 70),
 ]
 
@@ -218,16 +213,6 @@ if VERTEX_AVAILABLE:
                 thinking_level="minimal",
             ),
             200,
-        ),
-        _llm(
-            "vertex-gemini-2.5-flash-lite",
-            _gemini(
-                "gemini-2.5-flash-lite",
-                vertex=True,
-                temperature=1.0,
-                thinking_budget=0,
-            ),
-            190,
         ),
         _llm(
             "vertex-gemini-3.5-flash-lite",

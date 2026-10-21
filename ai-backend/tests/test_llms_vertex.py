@@ -44,7 +44,6 @@ def test_no_vertex_tier_without_credentials() -> None:
     assert prepost == [
         "google-gemini-3.1-flash-lite",
         "openai-gpt-5.6-luna",
-        "google-gemini-2.5-flash-lite",
         "google-gemini-3.5-flash-lite",
     ]
 
@@ -129,10 +128,6 @@ def test_model_kwargs_survive_the_helper() -> None:
 
     assert llms.google_gemini_3_1_flash_lite.temperature == 1.0
     assert llms.google_gemini_3_1_flash_lite.thinking_level == "minimal"
-    flash_lite = _generation_config(llms.google_gemini_2_5_flash_lite)
-    assert flash_lite["temperature"] == 1.0
-    assert flash_lite["thinking_config"]["thinking_budget"] == 0
-    assert "thinking_level" not in flash_lite["thinking_config"]
     assert llms.openai_gpt_5_6_luna.temperature == 1.0
     assert llms.openai_gpt_5_6_luna.reasoning_effort == "minimal"
 

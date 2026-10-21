@@ -36,8 +36,3 @@ def test_pre_post_roster_generation_config() -> None:
     previous = _generation_config(by_name["google-gemini-3.1-flash-lite"])
     assert previous["temperature"] == 1.0
     assert _thinking_level(previous) == "minimal"
-
-    oldest = _generation_config(by_name["google-gemini-2.5-flash-lite"])
-    assert oldest["temperature"] == 1.0
-    assert oldest["thinking_config"]["thinking_budget"] == 0
-    assert "thinking_level" not in oldest["thinking_config"]

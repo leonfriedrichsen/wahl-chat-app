@@ -104,11 +104,6 @@ def _build_pre_post_llms() -> list[_LLM]:
             90,
         ),
         _LLM(
-            "google-gemini-2.5-flash-lite",
-            _gemini("gemini-2.5-flash-lite", temperature=1.0, thinking_budget=0),
-            80,
-        ),
-        _LLM(
             "google-gemini-3.5-flash-lite",
             _gemini("gemini-3.5-flash-lite", thinking_level="minimal"),
             70,
@@ -135,16 +130,6 @@ def _build_pre_post_llms() -> list[_LLM]:
                 thinking_level="minimal",
             ),
             200,
-        ),
-        _LLM(
-            "vertex-gemini-2.5-flash-lite",
-            _gemini(
-                "gemini-2.5-flash-lite",
-                vertex=True,
-                temperature=1.0,
-                thinking_budget=0,
-            ),
-            190,
         ),
         _LLM(
             "vertex-gemini-3.5-flash-lite",

@@ -20,6 +20,9 @@ declare global {
       REVALIDATE_SECRET: string;
       IS_EMBEDDED: TruthyKinda;
       WAHL_AGENT_BACKEND_URL?: string;
+      BREVO_API_KEY?: string;
+      BRIEFING_SENDER_EMAIL?: string;
+      BRIEFING_SENDER_NAME?: string;
     }
   }
 }

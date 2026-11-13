@@ -113,6 +113,15 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == user_id;
     }
 
+    // Briefing subscriptions: address, parliaments and double opt-in state.
+    // Only the server writes them (admin SDK), so nobody can mark their own
+    // or anyone else's address as confirmed. Topic interests are not here;
+    // they stay on the user's own doc.
+    match /briefing_subscriptions/{user_id} {
+      allow read: if request.auth != null && request.auth.uid == user_id;
+      allow write: if false;
+    }
+
     // PledgeTracker study participants (consent, cohort, interaction log).
     // Doc id IS the uid — each participant reads/writes only their own record;
     // researchers read via the admin SDK, which bypasses rules.

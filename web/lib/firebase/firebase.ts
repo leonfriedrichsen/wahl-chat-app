@@ -1,5 +1,9 @@
 import type { WahlChatUser } from '@/components/anonymous-auth';
 import {
+  type BriefingSubscription,
+  TOPICS_CONSENT_VERSION,
+} from '@/lib/briefing/subscription';
+import {
   getCurrentVisitId,
   getOrLoadPageVisitSnapshot,
 } from '@/lib/page-visit/page-visit';
@@ -22,6 +26,7 @@ import {
   arrayUnion,
   collection,
   connectFirestoreEmulator,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -512,6 +517,12 @@ export async function getUser(uid: string) {
   return {
     id: user.id,
     ...data,
+    // Named even when absent: the auth provider merges this object into the
+    // user it holds, so a deleted field would otherwise linger there. Deleted
+    // topics must not show up as still selected.
+    briefing_topics: data?.briefing_topics,
+    briefing_topics_consent: data?.briefing_topics_consent,
+    briefings_onboarding_dismissed_at: data?.briefings_onboarding_dismissed_at,
     survey_status: data?.survey_status
       ? {
           state: data.survey_status.state,
@@ -535,15 +546,72 @@ export async function userAllowNewsletter(uid: string, allowed: boolean) {
   );
 }
 
-/** A reader who signed up from the feed to hear when personalised briefings
- * launch. Kept on their own user doc, which only they can write. */
-export async function userJoinBriefingsWaitlist(uid: string) {
+function toBriefingSubscription(
+  data: Record<string, unknown> | undefined,
+): BriefingSubscription | null {
+  if (!data) {
+    return null;
+  }
+  return {
+    status: data.status as BriefingSubscription['status'],
+    email: (data.email as string | undefined) ?? null,
+    parliaments:
+      (data.parliaments as BriefingSubscription['parliaments']) ?? [],
+    requested_at:
+      firestoreTimestampToDate(data.requested_at as Timestamp | null) ?? null,
+    confirmed_at:
+      firestoreTimestampToDate(data.confirmed_at as Timestamp | null) ?? null,
+  };
+}
+
+export async function getBriefingSubscription(uid: string) {
+  const snapshot = await getDoc(doc(db, 'briefing_subscriptions', uid));
+  return toBriefingSubscription(snapshot.data());
+}
+
+/** The reader's own briefing subscription, as the server wrote it; null when
+ * there is none or it cannot be read. */
+export function listenToBriefingSubscription(
+  uid: string,
+  callback: (subscription: BriefingSubscription | null) => void,
+) {
+  return onSnapshot(
+    doc(db, 'briefing_subscriptions', uid),
+    (snapshot) => callback(toBriefingSubscription(snapshot.data())),
+    () => callback(null),
+  );
+}
+
+/** Topic interests stay on the user's own doc, never next to the address in
+ * `briefing_subscriptions`, and are only written together with the explicit
+ * consent they need (GDPR Art. 9(2)(a)). */
+export async function saveBriefingTopics(uid: string, topics: string[]) {
   await setDoc(
     doc(db, 'users', uid),
     {
-      briefings_waitlist: true,
-      briefings_waitlist_at: serverTimestamp(),
+      briefing_topics: topics,
+      briefing_topics_consent: {
+        at: serverTimestamp(),
+        version: TOPICS_CONSENT_VERSION,
+      },
     },
+    { merge: true },
+  );
+}
+
+/** Withdrawing the consent deletes what it covered. */
+export async function deleteBriefingTopics(uid: string) {
+  await updateDoc(doc(db, 'users', uid), {
+    briefing_topics: deleteField(),
+    briefing_topics_consent: deleteField(),
+  });
+}
+
+/** A waitlist reader who closed the onboarding is not asked again. */
+export async function dismissBriefingOnboarding(uid: string) {
+  await setDoc(
+    doc(db, 'users', uid),
+    { briefings_onboarding_dismissed_at: serverTimestamp() },
     { merge: true },
   );
 }

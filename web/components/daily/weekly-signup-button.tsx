@@ -10,20 +10,21 @@ import { forwardRef, useEffect, useState } from 'react';
 import { FOCUS_RING } from './card-styles';
 
 /**
- * "Meine Woche": asks readers to sign up for the weekly digest. A pulsing
- * red dot marks it as new until this browser opens it once. Forwards its
- * props, since the login dialog's trigger renders through it.
+ * "Briefing abonnieren": asks readers to set up the briefing after each sitting
+ * week. A pulsing red dot marks it as new until this browser opens it once;
+ * `highlight` shows the dot regardless, for readers we have news for. Forwards
+ * its props, since the dialogs' triggers render through it.
  */
 const WeeklySignupButton = forwardRef<
   HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement>
->(({ className, onClick, ...props }, ref) => {
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { highlight?: boolean }
+>(({ className, onClick, highlight = false, ...props }, ref) => {
   const [isNew, setIsNew] = useState(false);
 
   // localStorage only exists after hydration.
   useEffect(() => {
-    setIsNew(!weeklySignupOpened());
-  }, []);
+    setIsNew(highlight || !weeklySignupOpened());
+  }, [highlight]);
 
   return (
     <button
@@ -44,7 +45,11 @@ const WeeklySignupButton = forwardRef<
       )}
     >
       <MailIcon className="size-4" aria-hidden />
-      Meine Woche
+      {/* Phones show "Briefing" alone; screen readers always hear the
+          whole action. */}
+      <span>
+        Briefing<span className="max-sm:sr-only"> abonnieren</span>
+      </span>
       {isNew && (
         <span className="absolute -right-1 -top-1 flex size-2.5">
           <span

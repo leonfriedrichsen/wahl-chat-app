@@ -873,6 +873,50 @@ function Impressum() {
           Kontaktmöglichkeiten, vorzugswürdig E-Mail, hierzu nutzen.
         </li>
       </ul>
+      <h2 id="briefing">Briefing nach Sitzungswochen</h2>
+      <p>
+        Angemeldete Nutzer können ein Briefing einrichten. Nach jeder
+        Sitzungswoche der gewählten Parlamente schicken wir eine kurze E-Mail,
+        die auf das Briefing auf wahl.chat hinweist. Diese E-Mail ist für alle
+        Empfänger eines Parlaments gleich und nennt keine Themen.
+      </p>
+      <p>
+        <strong>E-Mail-Adresse und Double-Opt-in:</strong> Wir speichern Ihre
+        E-Mail-Adresse, die gewählten Parlamente, den Zeitpunkt der Anmeldung
+        und der Bestätigung sowie die Version des Einwilligungstextes. Erst
+        nachdem Sie den Link in unserer Bestätigungs-E-Mail angeklickt haben,
+        erhalten Sie das Briefing. Mit der Abmeldung löschen wir Ihre
+        E-Mail-Adresse aus dem Verteiler und Ihre gewählten Themen.
+      </p>
+      <p>
+        <strong>Themen:</strong> Die Themen, die Sie für Ihr Briefing wählen,
+        können Rückschlüsse auf Ihre politischen Ansichten zulassen (besondere
+        Kategorien personenbezogener Daten, Art. 9 DSGVO). Wir speichern sie nur
+        mit Ihrer ausdrücklichen Einwilligung, getrennt von Ihrer E-Mail-Adresse
+        und ausschließlich, um Ihnen passende Inhalte auf wahl.chat zu zeigen.
+        Sie werden nicht an unseren E-Mail-Dienstleister übermittelt. Sie können
+        die Einwilligung in den Briefing-Einstellungen jederzeit widerrufen;
+        Ihre Themen werden dann gelöscht.
+      </p>
+      <p>
+        <strong>Versanddienstleister:</strong> Für den Versand nutzen wir Brevo
+        (Sendinblue SAS, 106 boulevard Haussmann, 75008 Paris, Frankreich) im
+        Rahmen eines Auftragsverarbeitungsvertrags. Brevo erhält Ihre
+        E-Mail-Adresse und den Text der jeweiligen E-Mail.
+      </p>
+      <ul className="m-elements">
+        <li>
+          <strong>Rechtsgrundlagen:</strong> Einwilligung (Art. 6 Abs. 1 S. 1
+          lit. a) DSGVO); für die Themen ausdrückliche Einwilligung (Art. 9 Abs.
+          2 lit. a) DSGVO).
+        </li>
+        <li>
+          <strong>Widerruf:</strong> Abmeldung und Löschung der Themen sind
+          jederzeit in den Briefing-Einstellungen möglich, ohne dass die
+          Rechtmäßigkeit der bis zum Widerruf erfolgten Verarbeitung berührt
+          wird.
+        </li>
+      </ul>
       <h2 id="m638">
         Werbliche Kommunikation via E-Mail, Post, Fax oder Telefon
       </h2>

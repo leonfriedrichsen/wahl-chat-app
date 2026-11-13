@@ -20,6 +20,8 @@ const STATIC_PAGES = [
   '/topics',
   '/aktuell',
   '/election-chat',
+  '/einstellungen',
+  '/briefing',
   '/api',
 ];
 

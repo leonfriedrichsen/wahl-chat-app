@@ -1,5 +1,6 @@
 'use client';
 import { useAnonymousAuth } from '@/components/anonymous-auth';
+import BriefingOnboarding from '@/components/briefing/briefing-onboarding';
 import {
   ResponsiveDialogDescription,
   ResponsiveDialogTitle,
@@ -10,7 +11,8 @@ import { useStudyRunning } from '@/components/providers/study-status-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { getUser, userJoinBriefingsWaitlist } from '@/lib/firebase/firebase';
+import { isBriefingSubscribed } from '@/lib/briefing/subscription';
+import { getBriefingSubscription, getUser } from '@/lib/firebase/firebase';
 import { FirebaseError } from 'firebase/app';
 import {
   EmailAuthProvider,
@@ -32,10 +34,10 @@ import WeeklySignup from './weekly-signup';
 
 type AuthProvider = 'google' | 'github' | 'email';
 
-/** Why the reader is asked to sign in. The feed asks them to sign up for
- * "Meine Woche", the weekly digest, which is also recorded on their user
- * doc. */
-export type LoginPurpose = 'chat-history' | 'briefings';
+/** Why the reader is asked to sign in. `briefings` is the sign-up for the
+ * briefing after each sitting week, which continues into its onboarding;
+ * `account` is a plain sign-in, from the feed header's own button. */
+export type LoginPurpose = 'chat-history' | 'briefings' | 'account';
 
 type Props = {
   onSuccess: () => void;
@@ -53,33 +55,46 @@ const DESCRIPTIONS: Record<
       'Du kannst dich bei wahl.chat registrieren um deine Chatverläufe zu speichern und mit mehreren Geräten abzurufen.',
   },
   briefings: {
-    login: 'Melde dich an, dann melden wir uns, sobald „Meine Woche“ losgeht.',
+    login: 'Melde dich an, danach wählst du deine Themen für dein Briefing.',
     register:
-      'Registriere dich mit E-Mail und Passwort, dann melden wir uns, sobald „Meine Woche“ losgeht.',
+      'Registriere dich mit E-Mail und Passwort, danach wählst du deine Themen für dein Briefing.',
+  },
+  account: {
+    login:
+      'Melde dich an, um deine Chats und dein Briefing auf allen Geräten zu nutzen.',
+    register:
+      'Registriere dich, um deine Chats und dein Briefing auf allen Geräten zu nutzen.',
   },
 };
 
 function LoginForm({ onSuccess, purpose = 'chat-history' }: Props) {
   const { refreshUser } = useAnonymousAuth();
   const studyRunning = useStudyRunning();
-  // "Meine Woche" opens on its own pitch; its email option is signing up.
+  // The briefing sign-up opens on its own pitch; its email option is
+  // signing up.
   const [showWeekly, setShowWeekly] = useState(purpose === 'briefings');
   const [isRegister, setIsRegister] = useState(purpose === 'briefings');
   const [isResetPassword, setIsResetPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [allowNewsletter, setAllowNewsletter] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const handleAuthSuccess = async () => {
     await refreshUser();
     const uid = getAuth().currentUser?.uid;
 
+    // The briefing sign-up goes on to its onboarding, which has its own consent
+    // steps, so the newsletter question is not asked on top of it. A reader
+    // who already has a briefing (signing in on another device) is done.
     if (uid && purpose === 'briefings') {
-      try {
-        await userJoinBriefingsWaitlist(uid);
-      } catch (error) {
-        // The sign-in itself worked; a missed waitlist mark must not undo it.
-        console.error('Could not join the briefings waitlist', error);
+      const subscription = await getBriefingSubscription(uid).catch(() => null);
+      if (isBriefingSubscribed(subscription)) {
+        onSuccess();
+        toast.success('Willkommen zurück! Dein Briefing läuft schon.');
+      } else {
+        setShowOnboarding(true);
       }
+      return;
     }
 
     if (uid) {
@@ -240,11 +255,7 @@ function LoginForm({ onSuccess, purpose = 'chat-history' }: Props) {
   };
 
   const showSuccessToast = () => {
-    toast.success(
-      purpose === 'briefings'
-        ? 'Du bist dabei – wir melden uns, sobald „Meine Woche“ startet.'
-        : 'Erfolgreich angemeldet',
-    );
+    toast.success('Erfolgreich angemeldet');
   };
 
   const handleResetPassword = async () => {
@@ -259,19 +270,12 @@ function LoginForm({ onSuccess, purpose = 'chat-history' }: Props) {
     return <PasswordResetForm onChangeView={handleChangeView} />;
   }
 
+  if (showOnboarding) {
+    return <BriefingOnboarding onDone={onSuccess} />;
+  }
+
   if (allowNewsletter) {
-    return (
-      <SuccessAuthForm
-        onSuccess={() => {
-          onSuccess();
-          // Signing up for "Meine Woche" is confirmed even when the
-          // newsletter question came first.
-          if (purpose === 'briefings') {
-            showSuccessToast();
-          }
-        }}
-      />
-    );
+    return <SuccessAuthForm onSuccess={onSuccess} />;
   }
 
   if (showWeekly) {

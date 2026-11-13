@@ -1,18 +1,22 @@
 import LoginButton from '@/components/auth/login-button';
 import UserAvatar from '@/components/auth/user-avatar';
+import BriefingSignedInEntry from '@/components/briefing/briefing-signed-in-entry';
 import Logo from '@/components/chat/logo';
 import { SITE_LINKS } from '@/lib/site-links';
 import { IS_EMBEDDED, cn } from '@/lib/utils';
 import { MessageCircleIcon } from 'lucide-react';
 import Link from 'next/link';
 import { FOCUS_RING, MUTED_TEXT } from './card-styles';
+import SignInButton from './sign-in-button';
 import WeeklySignupButton from './weekly-signup-button';
 
 /**
  * The site header on the feed's column width, so the logo and the login
  * button line up with the cards: "wahl.chat / News", the product's name next
  * to the brand. The Chat link opens the current election's page.
- * "Meine Woche" asks readers to sign up for the weekly digest.
+ * "Briefing abonnieren" is the sign-up for the briefing after each sitting week;
+ * "Anmelden" is a plain sign-in, so nobody has to go through the briefing
+ * pitch to reach their account.
  * Anleitung and Spenden live in the footer.
  */
 function DailyHeader({ chatHref }: { chatHref: string }) {
@@ -51,16 +55,21 @@ function DailyHeader({ chatHref }: { chatHref: string }) {
               )}
             >
               <MessageCircleIcon className="size-4" aria-hidden />
-              {/* The narrowest phones keep the icon, so "Meine Woche" fits. */}
+              {/* The narrowest phones keep the icon, so the briefing button fits. */}
               <span className="max-[380px]:sr-only">
                 {SITE_LINKS.chat.label}
               </span>
             </Link>
-            {/* The root layout seeds the auth state from the session, so a
-                signed-in reader gets the avatar on first paint. */}
+            <BriefingSignedInEntry />
             <LoginButton
               purpose="briefings"
               noUserChildren={<WeeklySignupButton />}
+            />
+            {/* The root layout seeds the auth state from the session, so a
+                signed-in reader gets the avatar on first paint. */}
+            <LoginButton
+              purpose="account"
+              noUserChildren={<SignInButton />}
               userChildren={<UserAvatar />}
             />
           </nav>

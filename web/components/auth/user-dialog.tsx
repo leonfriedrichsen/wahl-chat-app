@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { UserDetails } from '@/lib/utils';
 import { getAuth, signOut } from 'firebase/auth';
-import { LogOutIcon } from 'lucide-react';
+import { LogOutIcon, MailIcon } from 'lucide-react';
+import Link from 'next/link';
 import { useState } from 'react';
 
 type Props = {
@@ -72,6 +73,17 @@ function UserDialog({ children, details, asChild }: Props) {
                 value={user?.email ?? ''}
               />
             </div>
+          </div>
+          <div className="px-4 md:px-0">
+            <Button asChild variant="outline" className="w-full">
+              <Link
+                href="/einstellungen/briefing"
+                onClick={() => setIsOpen(false)}
+              >
+                <MailIcon className="size-4" />
+                Briefing-Einstellungen
+              </Link>
+            </Button>
           </div>
         </section>
 

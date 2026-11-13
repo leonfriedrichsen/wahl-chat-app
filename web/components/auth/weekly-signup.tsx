@@ -11,14 +11,18 @@ import { Button } from '@/components/ui/button';
 import { MailIcon } from 'lucide-react';
 import Link from 'next/link';
 
-/** What a "Meine Woche" email will look like. Made up, and marked so. */
-function SampleEmail() {
+/**
+ * What a briefing looks like: one sitting week, the matters on the reader's
+ * topics, each with its result. The example is real (Bundestag, October
+ * 2026) but trimmed, and marked as an example. It shows the briefing itself
+ * rather than the email: the email only says that a briefing is ready, and
+ * names no topic.
+ */
+function SampleBriefing() {
   return (
-    // md:mt-7 keeps the desktop dialog's close button clear of the sample;
-    // the phone sheet has none.
     <div
       aria-hidden
-      className="overflow-hidden rounded-lg border border-border bg-background text-left md:mt-7"
+      className="overflow-hidden rounded-lg border border-border bg-background text-left"
     >
       <div className="flex items-center gap-2 border-b border-border bg-muted px-3 py-2">
         <span className="flex size-[26px] shrink-0 items-center justify-center rounded-full bg-zinc-900">
@@ -26,45 +30,47 @@ function SampleEmail() {
         </span>
         <div className="min-w-0 flex-1 leading-tight">
           <div className="text-[11px] font-bold">
-            wahl.chat{' '}
-            <span className="font-normal text-muted-foreground">
-              · Mo, 9:00
-            </span>
+            Bundestag · Sitzungswoche 42
           </div>
           <div className="truncate text-[11px] text-muted-foreground">
-            Deine Woche: Krankenkasse, Heizung, Tempolimit
+            3 Beschlüsse zu deinen Themen
           </div>
         </div>
         <span className="text-[10px] font-bold text-muted-foreground">
           Beispiel
         </span>
       </div>
-      <div className="px-3.5 py-2.5 text-xs leading-snug">
-        <p className="mb-1.5">
-          Hallo Max, das war diese Woche im Bundestag für dich wichtig:
-        </p>
-        <ol className="flex list-decimal flex-col gap-0.5 pl-[18px] font-semibold">
-          <li>Krankenkassenbeiträge: Gesetz beschlossen</li>
-          <li>Heizungsgesetz: Die 65-Prozent-Regel fällt</li>
-          <li>Tempolimit abgelehnt</li>
-        </ol>
-        <div className="mt-2 rounded-r-md border-l-[3px] border-[#ED3833] bg-red-500/10 px-2.5 py-2">
-          <div className="mb-0.5 text-[11px] font-bold text-red-700 dark:text-red-400">
-            Was sich konkret für dich ändert
+      <ul className="flex flex-col divide-y divide-border text-xs leading-snug">
+        <li className="px-3.5 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Klimaschutz und Umwelt
           </div>
-          <div className="truncate text-muted-foreground [mask-image:linear-gradient(90deg,#000_70%,transparent)]">
-            Als gesetzlich Versicherter: Deine Zuzahlungen werden angepasst
-            um... …
+          <div className="font-semibold">
+            CO₂-Preis bleibt 2027 auf dem Niveau von 2026
           </div>
-        </div>
-      </div>
+          <div className="text-muted-foreground">
+            Angenommen · 303 dafür, 210 dagegen
+          </div>
+        </li>
+        <li className="px-3.5 py-2.5 [mask-image:linear-gradient(180deg,#000_40%,transparent)]">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Außenpolitik und Europa
+          </div>
+          <div className="font-semibold">
+            Bundeswehr bleibt bis Oktober 2027 im Roten Meer
+          </div>
+          <div className="text-muted-foreground">
+            Angenommen · 421 dafür, 66 dagegen
+          </div>
+        </li>
+      </ul>
     </div>
   );
 }
 
 /**
- * The "Meine Woche" sign-up: a sample of the email, the pitch, and the ways
- * to sign up, Google first. Holds no sign-in logic; the login form passes
+ * The briefing sign-up: a sample briefing, the pitch, and the ways to sign
+ * up, Google first. Holds no sign-in logic; the login form passes
  * its own handlers in.
  */
 function WeeklySignup({
@@ -82,16 +88,15 @@ function WeeklySignup({
 }) {
   return (
     <div className="flex flex-col gap-4 p-4 md:p-0">
-      <SampleEmail />
+      <SampleBriefing />
       <div className="flex flex-col gap-2">
         <ResponsiveDialogTitle className="text-left text-2xl font-extrabold leading-tight tracking-tight">
-          Deine Woche im Bundestag
+          Dein Briefing zum Bundestag
         </ResponsiveDialogTitle>
         <ResponsiveDialogDescription className="text-left text-[15px] text-muted-foreground">
-          Jede Woche die wichtigsten Infos aus Debatten und Abstimmungen zu
-          deinen Themen.
-          <br />
-          Bald gehts los, meld dich an und sei dabei!
+          Nach jeder Sitzungswoche: was zu deinen Themen beschlossen und
+          debattiert wurde, mit Quellen. Per E-Mail bekommst du einen kurzen
+          Hinweis, wenn dein Briefing bereitliegt.
         </ResponsiveDialogDescription>
       </div>
       <div className="flex flex-col gap-3">

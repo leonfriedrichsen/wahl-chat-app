@@ -103,6 +103,25 @@ export function ResponsiveDialogContent({
   );
 }
 
+/**
+ * Dialog content whose body scrolls on short screens. On desktop the scroll
+ * area runs to the dialog's edge, below a band that holds the close button,
+ * so the button never sits on top of the scrollbar or the text. The phone
+ * drawer has no close button; its inner box scrolls so the handle stays put
+ * and a drag still closes it.
+ */
+export function ResponsiveDialogScrollContent({
+  children,
+}: Pick<ResponsiveDefaultProps, 'children'>) {
+  return (
+    <ResponsiveDialogContent className="flex max-h-[95dvh] flex-col md:gap-0 md:p-0 md:pt-12">
+      <div className="min-h-0 overflow-y-auto overscroll-contain md:px-6 md:pb-6">
+        {children}
+      </div>
+    </ResponsiveDialogContent>
+  );
+}
+
 export function ResponsiveDialogClose({
   children,
   className,

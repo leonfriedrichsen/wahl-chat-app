@@ -3,7 +3,7 @@
 import { useAnonymousAuth } from '@/components/anonymous-auth';
 import {
   ResponsiveDialog,
-  ResponsiveDialogContent,
+  ResponsiveDialogScrollContent,
   ResponsiveDialogTrigger,
 } from '@/components/chat/responsive-drawer-dialog';
 import { type UserDetails, getUserDetailsFromUser } from '@/lib/utils';
@@ -66,17 +66,18 @@ function LoginButton({
   return (
     <>
       <ResponsiveDialog open={isOpen} onOpenChange={setIsOpen}>
-        <ResponsiveDialogTrigger asChild>
-          {noUserChildren}
-        </ResponsiveDialogTrigger>
-        {/* Scrolls on short screens: the "Meine Woche" pitch with its sample
-            email is taller than a phone. The inner box scrolls, so the
-            drawer's handle stays put and a drag still closes it. */}
-        <ResponsiveDialogContent className="flex max-h-[95dvh] flex-col">
-          <div className="min-h-0 overflow-y-auto overscroll-contain">
-            <LoginForm onSuccess={handleSuccess} purpose={purpose} />
-          </div>
-        </ResponsiveDialogContent>
+        {/* Once signed in, the dialog may stay open for a following step
+            (the briefing onboarding). Its trigger is gone by then: the header
+            already shows what a signed-in reader gets, and keeping it would
+            put the same button there twice. */}
+        {!hasUser && (
+          <ResponsiveDialogTrigger asChild>
+            {noUserChildren}
+          </ResponsiveDialogTrigger>
+        )}
+        <ResponsiveDialogScrollContent>
+          <LoginForm onSuccess={handleSuccess} purpose={purpose} />
+        </ResponsiveDialogScrollContent>
       </ResponsiveDialog>
     </>
   );

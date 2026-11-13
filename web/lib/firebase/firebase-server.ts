@@ -1199,8 +1199,22 @@ export async function getUser() {
       ...makeFirebaseUserSerializable(currentUser),
       id: user.id,
       ...data,
+      // Every Timestamp becomes a Date: this object is handed to a client
+      // component, which accepts no class instances.
       clicked_away_login_reminder: data?.clicked_away_login_reminder
         ? firestoreTimestampToDate(data.clicked_away_login_reminder)
+        : undefined,
+      briefings_waitlist_at: firestoreTimestampToDate(
+        data?.briefings_waitlist_at,
+      ),
+      briefings_onboarding_dismissed_at: firestoreTimestampToDate(
+        data?.briefings_onboarding_dismissed_at,
+      ),
+      briefing_topics_consent: data?.briefing_topics_consent
+        ? {
+            version: data.briefing_topics_consent.version,
+            at: firestoreTimestampToDate(data.briefing_topics_consent.at),
+          }
         : undefined,
       survey_status: data?.survey_status
         ? {

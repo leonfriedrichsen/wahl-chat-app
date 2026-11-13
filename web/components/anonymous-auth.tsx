@@ -31,6 +31,18 @@ export type WahlChatUser = {
     region: string;
     joined_at: Date | Timestamp;
   };
+  /** Set by the briefing sign-up before the briefing had an onboarding;
+   * these readers are offered it once. */
+  briefings_waitlist?: boolean;
+  briefings_waitlist_at?: Date | Timestamp;
+  briefings_onboarding_dismissed_at?: Date | Timestamp;
+  /** Topics for the briefing, with the explicit Art. 9 consent they were
+   * given under. The address lives elsewhere (`briefing_subscriptions`). */
+  briefing_topics?: string[];
+  briefing_topics_consent?: {
+    at: Date | Timestamp;
+    version: string;
+  };
 };
 
 export type SerializableFirebaseUser = UserInfo & {

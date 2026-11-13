@@ -51,6 +51,9 @@ const firestoreStore: SubscriptionStore = {
       .doc(uid)
       .set({ ...data, updated_at: Timestamp.now() });
   },
+  async delete(uid) {
+    await getAdminDb().collection(COLLECTION).doc(uid).delete();
+  },
   async findByTokenHash(hash) {
     const snapshot = await getAdminDb()
       .collection(COLLECTION)

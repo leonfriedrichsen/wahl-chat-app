@@ -29,6 +29,7 @@ export type StoredSubscription = {
 export type SubscriptionStore = {
   get(uid: string): Promise<StoredSubscription | null>;
   set(uid: string, data: StoredSubscription): Promise<void>;
+  delete(uid: string): Promise<void>;
   findByTokenHash(
     hash: string,
   ): Promise<{ uid: string; data: StoredSubscription } | null>;
@@ -125,8 +126,14 @@ export async function startSubscription(
     );
   } catch (error) {
     console.error('Could not send the briefing confirm mail', error);
-    // No mail went out, so the resend gap must not block the next try.
-    await deps.store.set(caller.uid, { ...pending, requested_at: null });
+    // No mail went out, so nothing may claim one did: a pending doc would
+    // read as "link sent" and count as subscribed. The earlier state comes
+    // back, and with it any earlier link that is still valid.
+    if (existing) {
+      await deps.store.set(caller.uid, existing);
+    } else {
+      await deps.store.delete(caller.uid);
+    }
     return { ok: false, error: 'send_failed' };
   }
 

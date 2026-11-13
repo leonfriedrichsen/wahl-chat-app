@@ -22,6 +22,9 @@ function memoryStore(): SubscriptionStore & {
     set: async (uid, data) => {
       docs.set(uid, data);
     },
+    delete: async (uid) => {
+      docs.delete(uid);
+    },
     findByTokenHash: async (hash) => {
       for (const [uid, data] of docs) {
         if (data.confirm_token_hash === hash) {
@@ -114,7 +117,7 @@ describe('starting a subscription', () => {
     });
   });
 
-  it('lets the next try through when the mail could not be sent', async () => {
+  it('leaves no pending subscription when the mail could not be sent', async () => {
     const store = memoryStore();
     const failing = await startSubscription(
       { caller: reader, parliaments: ['bundestag'] },
@@ -128,7 +131,33 @@ describe('starting a subscription', () => {
       },
     );
     expect(failing).toEqual({ ok: false, error: 'send_failed' });
-    expect(store.docs.get('u1')?.requested_at).toBeNull();
+    expect(store.docs.has('u1')).toBe(false);
+
+    // Nothing went out, so the resend gap does not block the next try.
+    const { result } = await subscribe(store);
+    expect(result).toEqual({ ok: true, status: 'pending' });
+  });
+
+  it('keeps the earlier link valid when a resend fails', async () => {
+    const { store, sent } = await subscribe();
+    const failing = await startSubscription(
+      { caller: reader, parliaments: ['bundestag'] },
+      {
+        store,
+        now: later(120_000),
+        siteUrl: 'https://wahl.chat',
+        sendMail: async () => {
+          throw new Error('provider down');
+        },
+      },
+    );
+    expect(failing).toEqual({ ok: false, error: 'send_failed' });
+    expect(
+      await confirmSubscription(
+        { token: tokenFrom(sent[0]) },
+        { store, now: later(130_000) },
+      ),
+    ).toEqual({ ok: true, status: 'active' });
   });
 
   it('only updates the parliaments of a confirmed subscription', async () => {

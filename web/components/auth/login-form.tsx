@@ -11,7 +11,6 @@ import { useStudyRunning } from '@/components/providers/study-status-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { isBriefingSubscribed } from '@/lib/briefing/subscription';
 import { getBriefingSubscription, getUser } from '@/lib/firebase/firebase';
 import { FirebaseError } from 'firebase/app';
 import {
@@ -85,10 +84,15 @@ function LoginForm({ onSuccess, purpose = 'chat-history' }: Props) {
 
     // The briefing sign-up goes on to its onboarding, which has its own consent
     // steps, so the newsletter question is not asked on top of it. A reader
-    // who already has a briefing (signing in on another device) is done.
+    // whose briefing is confirmed (signing in on another device) is done; an
+    // unconfirmed one goes through the onboarding again, which ends in a new
+    // confirm link.
     if (uid && purpose === 'briefings') {
       const subscription = await getBriefingSubscription(uid).catch(() => null);
-      if (isBriefingSubscribed(subscription)) {
+      if (
+        subscription?.status === 'active' ||
+        subscription?.status === 'paused'
+      ) {
         onSuccess();
         toast.success('Willkommen zurück! Dein Briefing läuft schon.');
       } else {

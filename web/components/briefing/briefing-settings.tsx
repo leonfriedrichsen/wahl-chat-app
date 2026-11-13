@@ -6,6 +6,17 @@ import {
   ResponsiveDialog,
   ResponsiveDialogScrollContent,
 } from '@/components/chat/responsive-drawer-dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
   type BriefingSubscription,
@@ -163,22 +174,41 @@ function EmailSection({
             Fortsetzen
           </Button>
         )}
-        <Button
-          type="button"
-          variant="ghost"
-          disabled={busy}
-          onClick={async () => {
-            await run(
-              unsubscribeBriefing,
-              'Du bist abgemeldet. Deine Adresse und Themen sind gelöscht.',
-            );
-            // The server deleted the topics; the page must not keep showing
-            // them.
-            await refreshUser();
-          }}
-        >
-          Abmelden
-        </Button>
+        {/* Asked first: it deletes the address and the topics, which no
+            button brings back. */}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button type="button" variant="ghost" disabled={busy}>
+              Abmelden
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Vom Briefing abmelden?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Wir löschen deine E-Mail-Adresse aus dem Verteiler und deine
+                gewählten Themen. Wenn du das Briefing später wieder möchtest,
+                richtest du es neu ein.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  await run(
+                    unsubscribeBriefing,
+                    'Du bist abgemeldet. Deine Adresse und Themen sind gelöscht.',
+                  );
+                  // The server deleted the topics; the page must not keep
+                  // showing them.
+                  await refreshUser();
+                }}
+              >
+                Abmelden
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Section>
   );
@@ -268,7 +298,9 @@ function PreferencesForm({
       await deleteBriefingTopics(user.uid);
       await refreshUser();
       reset();
-      toast.success('Deine Themen sind gelöscht.');
+      toast.success(
+        'Deine Themen sind gelöscht. Die E-Mails bekommst du weiter.',
+      );
     } catch (error) {
       console.error('Could not delete briefing topics', error);
       toast.error('Das hat nicht geklappt. Bitte versuche es noch einmal.');
@@ -321,6 +353,15 @@ function PreferencesForm({
           </>
         }
       >
+        {/* Deleting the topics leaves the subscription running, so the
+            reader is told the emails continue and what to do about it. */}
+        {savedTopics.length === 0 && (
+          <p className="rounded-lg border border-border p-3 text-sm">
+            Du hast keine Themen gespeichert, die E-Mails nach Sitzungswochen
+            bekommst du aber weiter. Wähle neue Themen oder melde dich oben ab,
+            wenn du keine E-Mails mehr möchtest.
+          </p>
+        )}
         <TopicPicker value={topics} onChange={setTopicsDraft} disabled={busy} />
         {needsConsent && (
           <TopicsConsent

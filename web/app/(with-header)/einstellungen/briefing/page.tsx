@@ -1,6 +1,5 @@
 import BriefingSettings from '@/components/briefing/briefing-settings';
 import type { Metadata } from 'next';
-import { Suspense } from 'react';
 
 export const metadata: Metadata = {
   title: 'Briefing-Einstellungen',
@@ -8,12 +7,7 @@ export const metadata: Metadata = {
 };
 
 function BriefingSettingsPage() {
-  // useSearchParams needs a Suspense boundary to keep the page static.
-  return (
-    <Suspense>
-      <BriefingSettings />
-    </Suspense>
-  );
+  return <BriefingSettings />;
 }
 
 export default BriefingSettingsPage;

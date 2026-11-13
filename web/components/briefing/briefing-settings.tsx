@@ -24,8 +24,6 @@ import {
   saveBriefingTopics,
 } from '@/lib/firebase/firebase';
 import type { DigestParliamentId } from '@/lib/firebase/firebase.types';
-import { CircleCheckIcon } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
 import { toast } from 'sonner';
 import { toastBriefingError, withIdToken } from './briefing-client';
@@ -410,7 +408,6 @@ function BriefingSettings() {
   const { subscription, loaded } = useBriefingSubscription(
     signedIn ? user.uid : undefined,
   );
-  const confirmed = useSearchParams().get('bestaetigt') === '1';
   const [onboarding, setOnboarding] = useState(false);
 
   if (loading && !user) {
@@ -435,15 +432,6 @@ function BriefingSettings() {
   return (
     <div className="flex flex-col gap-6 pt-8">
       <h1 className="text-2xl font-bold">Briefing</h1>
-      {confirmed && subscription?.status === 'active' && (
-        <div className="flex items-start gap-3 rounded-lg bg-muted p-4 text-sm">
-          <CircleCheckIcon className="mt-0.5 size-5 shrink-0" aria-hidden />
-          <p>
-            Deine E-Mail-Adresse ist bestätigt. Nach der nächsten Sitzungswoche
-            bekommst du dein erstes Briefing.
-          </p>
-        </div>
-      )}
       {loaded &&
         (subscription && isBriefingSubscribed(subscription) ? (
           <>

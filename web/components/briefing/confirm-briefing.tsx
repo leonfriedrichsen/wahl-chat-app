@@ -2,8 +2,8 @@
 
 import { Button } from '@/components/ui/button';
 import { confirmBriefingSubscription } from '@/lib/briefing/subscription-actions';
+import { CircleCheckIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { briefingErrorMessage } from './briefing-client';
 
@@ -11,10 +11,14 @@ import { briefingErrorMessage } from './briefing-client';
  * The page the confirm mail links to. Confirming takes a click rather than
  * happening on load: mail scanners open links on their own, and a confirmed
  * address must mean the reader asked for it.
+ *
+ * The success is shown here, not on the settings page: the link is often
+ * opened on a device the reader is not signed in on, where the settings
+ * would only ask them to sign in and the confirmation would look failed.
  */
 function ConfirmBriefing({ token }: { token: string }) {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const confirm = async () => {
@@ -22,7 +26,7 @@ function ConfirmBriefing({ token }: { token: string }) {
     try {
       const result = await confirmBriefingSubscription(token);
       if (result.ok) {
-        router.push('/einstellungen/briefing?bestaetigt=1');
+        setConfirmed(true);
         return;
       }
       setError(briefingErrorMessage(result));
@@ -36,7 +40,20 @@ function ConfirmBriefing({ token }: { token: string }) {
   return (
     <div className="flex flex-col gap-4 pt-8">
       <h1 className="text-2xl font-bold">Briefing bestätigen</h1>
-      {error ? (
+      {confirmed ? (
+        <>
+          <div className="flex items-start gap-3 rounded-lg bg-muted p-4 text-sm">
+            <CircleCheckIcon className="mt-0.5 size-5 shrink-0" aria-hidden />
+            <p>
+              Deine E-Mail-Adresse ist bestätigt. Nach der nächsten
+              Sitzungswoche bekommst du dein erstes Briefing.
+            </p>
+          </div>
+          <Button asChild variant="outline" className="self-start">
+            <Link href="/einstellungen/briefing">Zu den Einstellungen</Link>
+          </Button>
+        </>
+      ) : error ? (
         <>
           <p className="text-muted-foreground">
             {error} In den Einstellungen kannst du dir eine neue E-Mail schicken
